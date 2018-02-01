@@ -1,0 +1,1 @@
+powershell.exe -executionpolicy bypass -windowstyle normal -nologo -file "Launcher.ps1"
