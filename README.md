@@ -57,7 +57,7 @@
 #
 #		Get-ServerConfig
 #
-#			Iterates through a list of servers to return configuration data out to a spreadsheet report. Requires ImportExcedlModule and dbatools. Data returned is:
+#			Iterates through a list of servers to return configuration data. Returns an array of objects. Requires dbatools. Data returned is:
 #
 #				- Server host names and FQDN
 #				- Manufacturer
