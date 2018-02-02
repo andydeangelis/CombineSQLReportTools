@@ -10,11 +10,12 @@
 #    Usage: 
 #           - Multiple servers can be passed to the -ComputerNames paramater.
 #           - The user running the script needs to be a local administrator on the target servers to gather WMI data.
-#           - This script also uses dbatools and ImportExcel PowerShell modules.
+#           - This script also uses dbatools.
+#           - The result returned is an array of objects that can then be passed to anything (CSV, Excel, other functions, etc.)
 #    Examples:
 #               . .\Get-ServerConfig.ps1
 #
-#               Get-ServerConfig -ComputerName SERVER1,SERVER2,SERVER3 -Path <PATH_TO_EXCEL_OUTPUT>
+#               Get-ServerConfig -ComputerName SERVER1,SERVER2,SERVER3
 #
 #````Note: Powershellv3 or higher is needed.
 #######################################################################################################################################
@@ -28,15 +29,11 @@ function Get-ServerConfig
 
   # This is the -instance.Name parameter passed from the PS_SQL_DB_Info.ps1 script, hence the 'ValueFromPipeline' definition.
   Param(
-      [parameter(Mandatory=$true,ValueFromPipeline=$True)] $ComputerNames,
-      [parameter(Mandatory=$true,ValueFromPipeline=$True)] $Path
+      [parameter(Mandatory=$true,ValueFromPipeline=$True)] $ComputerNames
+   #   [parameter(Mandatory=$true,ValueFromPipeline=$True)] $Path
   )
   
-  Write-Host "Stand-alone server config will be stored in $Path" -ForegroundColor DarkMagenta
-  
   $ServerConfigResult = @()
-  $ServerDiskCOnfig = @()
-  # $ServerOS = @()
   
   # Let's get some data. For each server in the $ComputerNames array. get target computer system information and add it to the array.
   
@@ -92,10 +89,9 @@ function Get-ServerConfig
             $ServerConfigObject.PSObject.Properties.Remove('DaylightInEffect')
             $ServerConfigObject.PSObject.Properties.Remove('AdminPasswordStatus')
             $ServerConfigObject.PSObject.Properties.Remove('TotalPhysicalMemory')
-            $ServerConfigResult += $ServerConfigObject   
             
-            $ServerDiskConfig += Get-DbaDiskSpace -ComputerName $server                                                                    
-        
+            $ServerConfigResult += $ServerConfigObject   
+          
           }
         }
         else
@@ -107,33 +103,9 @@ function Get-ServerConfig
     {
         Write-Host "Server name is null."
     }
-  }
-
-  # Set the worksheet name. We will have a single Excel file with one tab per Server.
-  
-  $ServerConfigWorksheet = "Server Config"
-  $ServerDiskConfigWorksheet = "Disk Config"
-  # $ServerOSWorksheet = "Operating Systems"
     
-  # Set the table names for the worksheet.
-  
-  $ServerConfigTableName = "ServerConfig"
-  $ServerDiskConfigTableName = "DiskConfig"
-  # $ServerOSTableName = "OSConfig"
-  
-  # TO-DO: Add some error handling here (i.e. check to ensure the arrays are not empty or null).
-    
-  if (($ServerConfigResult -ne $null) -and ($ServerDiskConfig -ne $null))
-  {
-    $excel = $ServerConfigResult | Export-Excel -Path $Path -AutoSize -WorksheetName $ServerConfigWorksheet -FreezeTopRow -TableName $ServerConfigTableName -PassThru
-    $excel.Save() ; $excel.Dispose()
-    $excel2 = $ServerDiskConfig | Export-Excel -Path $Path -AutoSize -WorksheetName $ServerDiskConfigWorksheet -FreezeTopRow -TableName $ServerDiskConfigTableName -PassThru
-    $excel2.Save() ; $excel2.Dispose()
-    # $ServerOS | Export-Excel -Path $Path -AutoSize -WorksheetName $ServerOSWorksheet -FreezeTopRow -TableName $ServerOSTableName
   }
-  else
-  {
-    Write-Host "No stand-alone server data."
-  }
-    
+ 
+  return $ServerConfigResult
+  
 }

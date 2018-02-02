@@ -66,9 +66,6 @@ if (!(Test-Path $logFile))
     New-Item -ItemType File -Force -Path $logFile
 }
 
-# Create a new, empty Excel document for Stand-alone Server Configuration.
-$ServerConfigxlsxReportPath =  "$targetPath\ServerConfigReport-$datetime.xlsx"
-
 Write-Host "Server Config will be written to $ServerConfigxlsxReportPath" -ForegroundColor DarkGreen
 
 # Create a new, empty Excel document for SQL Data.
@@ -103,7 +100,57 @@ $jobNames = @()
 
 if ($Servers -ne $null)
 {
-  Get-ServerConfig -ComputerNames $Servers -Path "$ServerConfigxlsxReportPath"
+  # First, we'll get the server data returned as an array.
+
+  $ServerConfigResult = Get-ServerConfig -ComputerNames $Servers
+  
+  # Next, let's get the disk configuration data. We'll start by declaring the array that we will hold the disk config objects in.
+  
+  $ServerDiskCOnfig = @()
+
+  # Now, we'll iterate through each server in the list, get the data, and add it to the array.
+
+  foreach ($server in $Servers)
+  {
+    if (Test-Connection $server -Count 2 -Quiet)
+    {
+        $ServerDiskConfig += Get-DbaDiskSpace -ComputerName $server
+    }
+    else
+    {
+        Write-Host "Unable to connect to $server." -ForegroundColor Red
+    }
+  }
+
+  # Set the worksheet name. We will have a single Excel file with one tab per Server.
+  
+  $ServerConfigWorksheet = "Server Config"
+  $ServerDiskConfigWorksheet = "Disk Config"
+  # $ServerOSWorksheet = "Operating Systems"
+    
+  # Set the table names for the worksheet.
+  
+  $ServerConfigTableName = "ServerConfig"
+  $ServerDiskConfigTableName = "DiskConfig"
+  # $ServerOSTableName = "OSConfig"
+  
+  # TO-DO: Add some error handling here (i.e. check to ensure the arrays are not empty or null).
+    
+  if (($ServerConfigResult -ne $null) -and ($ServerDiskConfig -ne $null))
+  {
+    # Create a new, empty Excel document for Stand-alone Server Configuration.
+    $ServerConfigxlsxReportPath =  "$targetPath\ServerConfigReport-$datetime.xlsx"
+    
+    $excel = $ServerConfigResult | Export-Excel -Path $ServerConfigxlsxReportPath -AutoSize -WorksheetName $ServerConfigWorksheet -FreezeTopRow -TableName $ServerConfigTableName -PassThru
+    $excel.Save() ; $excel.Dispose()
+    $excel2 = $ServerDiskConfig | Export-Excel -Path $ServerConfigxlsxReportPath -AutoSize -WorksheetName $ServerDiskConfigWorksheet -FreezeTopRow -TableName $ServerDiskConfigTableName -PassThru
+    $excel2.Save() ; $excel2.Dispose()
+    # $ServerOS | Export-Excel -Path $Path -AutoSize -WorksheetName $ServerOSWorksheet -FreezeTopRow -TableName $ServerOSTableName
+  }
+  else
+  {
+    Write-Host "No server data found."
+  }
 }
 else
 {
