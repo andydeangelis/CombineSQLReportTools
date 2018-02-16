@@ -26,6 +26,22 @@
 
 . $PSScriptRoot\IncludeMe.ps1
 
+# Add the required .NET assembly for Windows Forms.
+Add-Type -AssemblyName System.Windows.Forms
+
+# Show the MsgBox. This is going to ask if the user needs to specify a separate SQL logon.
+$result = [System.Windows.Forms.MessageBox]::Show('Do you need to specify a separate SQL logon account?', 'Warning', 'YesNo', 'Warning')
+
+# Check the result. If the user needs to specify a separate SQL logon, they will be prompted with a credential dialog.
+if ($result -eq 'Yes')
+{
+  $sqlCred = Get-Credential -Message "Please specify your SQL username and password."  
+}
+else
+{
+  Write-Warning 'No SQL logon specifed. Using domain account...'
+}
+
 # List SQL scripts.
 # This is the SQL Query that will return the the database information and average performance data of each database file in the instance.
 # This is kept external so as not have issues with formatting within the PS script itself, while also being able to be
@@ -69,13 +85,13 @@ if (!(Test-Path $logFile))
 Write-Host "Server Config will be written to $ServerConfigxlsxReportPath" -ForegroundColor DarkGreen
 
 # Create a new, empty Excel document for SQL Data.
-$SQLDataxlsxReportPath =  "$targetPath\SQLServerDBReport-$datetime.xlsx"
-$clSQLDataxlsxReportPath =  "$targetPath\clSQLServerDBReport-$datetime.xlsx"
-$agSQLDataxlsxReportPath =  "$targetPath\agSQLServerDBReport-$datetime.xlsx"
+$SQLDataxlsxReportPath =  "$targetPath\StandaloneSQLServerDBReport-$datetime.xlsx"
+$clSQLDataxlsxReportPath =  "$targetPath\ClusteredSQLServerDBReport-$datetime.xlsx"
+$agSQLDataxlsxReportPath =  "$targetPath\AvailabilityGroupSQLServerDBReport-$datetime.xlsx"
 
 # Create a new, empty Excel document for Cluster Configuration.
-$clClusterConfigxlsxReportPath =  "$targetPath\clConfigReport-$datetime.xlsx"
-$agConfigxlsxReportPath =  "$targetPath\agConfigReport-$datetime.xlsx"
+$clClusterConfigxlsxReportPath =  "$targetPath\ClusterConfigReport-$datetime.xlsx"
+$agConfigxlsxReportPath =  "$targetPath\AvailabilityGroupConfigReport-$datetime.xlsx"
 
 # Get all the server config information.
 
@@ -122,18 +138,16 @@ if ($Servers -ne $null)
     }
   }
 
-  # Set the worksheet name. We will have a single Excel file with one tab per Server.
+  # Set the worksheet names. 
   
   $ServerConfigWorksheet = "Server Config"
   $ServerDiskConfigWorksheet = "Disk Config"
-  # $ServerOSWorksheet = "Operating Systems"
-    
+      
   # Set the table names for the worksheet.
   
   $ServerConfigTableName = "ServerConfig"
   $ServerDiskConfigTableName = "DiskConfig"
-  # $ServerOSTableName = "OSConfig"
-  
+    
   # TO-DO: Add some error handling here (i.e. check to ensure the arrays are not empty or null).
     
   if (($ServerConfigResult -ne $null) -and ($ServerDiskConfig -ne $null))
@@ -231,29 +245,87 @@ if ($ClusterNames -ne $null)
         {
           # SQL Instances have been found!
           
-          Write-Host "Stand alone SQL Instances have been found." -ForegroundColor Green
+          Write-Host "SQL Instances have been found." -ForegroundColor Green
           foreach ($instance in $agSQLInstances)
           {
             # Test the connection to the SQL instance.
-            # Now that we have the instance, let's check to be sure the user we are running the script can actually log in to the instance.
+            # First we will try to connect to the instance using the domain credentials, then, if specified, we'll use the SQL credentials.
+
+            try
+            {
+                $testDBAConnectionDomain = Test-DbaConnection -sqlinstance $instance
+            }
+            catch
+            {
+              "No connection could be made using domain credentials."
+            }
             
-            $testDBAConnection = Test-DbaConnection -sqlinstance $instance.Name
-          
-            if ($testDBAConnection)
+            try
+            {
+               $testDBAConnectionSQL = Test-DbaConnection -sqlinstance $instance -SQLCredential $sqlCred
+            }
+            catch
+            {
+              "No connection could be made using SQL credentials."
+            }
+            
+            # If domain credential connections are successful, use domain credentials, regardless if SQL creds are specified or successful.
+
+            if (($testDBAConnectionDomain -and $testDBAConnectionSQL) -or ($testDBAConnectionDomain -and !($testDBAConnectionSQL)))
             {
               # If the connection to the SQL instance is successful, call the Get-SQLData function.       
-              Get-SqlData -instanceName $instance.Name -Path $agSQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery
+              Get-SqlData -instanceName $instance -Path $agSQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery
+              
+              $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
+                              
+              $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
               
               # Add the SQL configuration to the global variable.
-              $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance.Name
-              $sqlVersionConfig += $instance
+              $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance
+              $sqlVersionConfig += $config
               
               # We've gotten all the database information and added to the correct file.
               # Now, we're going to check if there are any Availability Groups present.
               
-              if (Get-DbaAvailabilityGroup -SqlInstance $instance.Name)
+              if (Get-DbaAvailabilityGroup -SqlInstance $instance)
               {
-                $agConfigResult += Get-DbaAvailabilityGroup -SqlInstance $instance.Name                           
+                $agConfigResult = Get-DbaAvailabilityGroup -SqlInstance $instance | select Name,ComputerName,InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
+                                                                                                  PrimaryReplica,AutomatedBackupPreference,BasicAvailabilityGroup,FailureConditionLevel,
+                                                                                                  HealthCheckTimeout,ID,IsDistributedAvailabilityGroup,LocalReplicaRole,PrimaryReplicaServerName,
+                                                                                                  AvailabilityGroupListeners,State                
+              }
+              else
+              {
+                Write-Host "No availability groups have been found."
+              }
+            }
+            # If domain credentials are unsuccessful and SQL credentials are successful, use SQL credentials.
+
+            elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
+            {
+              # If the connection to the SQL instance is successful, call the Get-SQLData function.       
+              Get-SqlData -instanceName $instance -Path $agSQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery -Credential $sqlCred
+              
+              $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
+              $edition.ConnectionContext.LoginSecure=$false
+              $edition.ConnectionContext.set_Login($sqlCred.UserName)
+              $edition.ConnectionContext.set_SecurePassword($sqlCred.Password)
+                
+              $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+              
+              # Add the SQL configuration to the global variable.
+              $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
+              $sqlVersionConfig += $config
+              
+              # We've gotten all the database information and added to the correct file.
+              # Now, we're going to check if there are any Availability Groups present.
+              
+              if (Get-DbaAvailabilityGroup -SqlInstance $instance -Credential $sqlCred)
+              {
+                $agConfigResult = Get-DbaAvailabilityGroup -SqlInstance $instance -SQLCredential $sqlCred | select Name,ComputerName,InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
+                                                                                                  PrimaryReplica,AutomatedBackupPreference,BasicAvailabilityGroup,FailureConditionLevel,
+                                                                                                  HealthCheckTimeout,ID,IsDistributedAvailabilityGroup,LocalReplicaRole,PrimaryReplicaServerName,
+                                                                                                  AvailabilityGroupListeners,State                
               }
               else
               {
@@ -265,7 +337,7 @@ if ($ClusterNames -ne $null)
               # If the testDBAConnection variable returns false, write an error.
               
               $errorDateTime = get-date -f MM-dd-yyyy_hh.mm.ss
-              $testConnectMsg = "<$errorDateTime> - No connection could be made to " + $instance.Name + ". Authentication or network issue?"
+              $testConnectMsg = "<$errorDateTime> - No connection could be made to $instance . Authentication or network issue?"
               Write-host $testConnectMsg -foregroundcolor "magenta"
               $testConnectMsg | Out-File -FilePath $failedConnections -Append
             }
@@ -306,19 +378,55 @@ if ($ClusterNames -ne $null)
       foreach($instance in $clSQLInstances)
       {
         # Test the connection to the SQL instance.
-        # Now that we have the instance, let's check to be sure the user we are running the script can actually log in to the instance.
+        # First we will try to connect to the instance using the domain credentials, then, if specified, we'll use the SQL credentials.
+
+        try
+        {
+            $testDBAConnectionDomain = Test-DbaConnection -sqlinstance $instance
+        }
+        catch
+        {
+          "No connection could be made using Domain credentials."
+        }
+              
+        try
+        {
+            $testDBAConnectionSQL = Test-DbaConnection -sqlinstance $instance -SQLCredential $sqlCred
+        }
+        catch
+        {
+          "No connection could be made using SQL credentials."
+        }
           
-        $testDBAConnection = Test-DbaConnection -sqlinstance $instance
-          
-        if ($testDBAConnection)
+        if (($testDBAConnectionDomain -and $testDBAConnectionSQL) -or ($testDBAConnectionDomain -and !($testDBAConnectionSQL)))
         {
           # If the connection to the SQL instance is successful, call the Get-SQLData function.       
           Get-SqlData -instanceName $instance -Path $clSQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery
           
+          $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
+                
+          $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+              
           # Add the SQL configuration to the global variable.
-          $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance  
-          $sqlVersionConfig += $instance            
+          $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance
+          $sqlVersionConfig += $config
         }
+        elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
+        {
+          # If the connection to the SQL instance is successful, call the Get-SQLData function.       
+          Get-SqlData -instanceName $instance -Path $clSQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery -Credential $sqlCred
+          
+          $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
+          $edition.ConnectionContext.LoginSecure=$false
+          $edition.ConnectionContext.set_Login($sqlCred.UserName)
+          $edition.ConnectionContext.set_SecurePassword($sqlCred.Password)
+                
+          $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+              
+          # Add the SQL configuration to the global variable.
+          $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
+          $sqlVersionConfig += $config
+        }        
         else
         {
           $errorDateTime = get-date -f MM-dd-yyyy_hh.mm.ss
@@ -365,27 +473,66 @@ foreach ($server in $ServerNames)
             
             foreach($instance in $SQLInstances)
             {
-                # Test the connection to the SQL instance.
-                $testDBAConnection = Test-DbaConnection -sqlinstance $instance.Name
-                
-                # Now that we have the instance, let's check to be sure the user we are running the script can actually log in to the instance.
+              # Test the connection to the SQL instance.
+              # First we will try to connect to the instance using the domain credentials, then, if specified, we'll use the SQL credentials.
 
-                if ($testDBAConnection)
-                {
-                    # If the connection to the SQL instance is successful, call the Get-SQLData function.       
-                    Get-SqlData -instanceName $instance.Name -Path $SQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery
-                    
-                    # Add the SQL configuration to the global variable.
-                    $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance.Name   
-                    $sqlVersionConfig += $instance        
-                }
-                else
-                {
-                    $errorDateTime1 = get-date -f MM-dd-yyyy_hh.mm.ss
-                    $testConnectMsg = "<$errorDateTime1> - No connection could be made to " + $instance.Name + ". Authentication or network issue?"
-                    Write-host $testConnectMsg -foregroundcolor "magenta"
-                    $testConnectMsg | Out-File -FilePath $failedConnections -Append
-                }
+              try
+              {
+                  $testDBAConnectionDomain = Test-DbaConnection -sqlinstance $instance
+              }
+              catch
+              {
+                "No connection could be made using Domain credentials."
+              }
+              
+              try
+              {
+                 $testDBAConnectionSQL = Test-DbaConnection -sqlinstance $instance -SQLCredential $sqlCred
+              }
+              catch
+              {
+                "No connection could be made using SQL credentials."
+              }
+                            
+              # If domain credential connections are successful, use domain credentials, regardless if SQL creds are specified or successful.
+            
+              if (($testDBAConnectionDomain -and $testDBAConnectionSQL) -or ($testDBAConnectionDomain -and !($testDBAConnectionSQL)))
+              {
+                # If the connection to the SQL instance is successful, call the Get-SQLData function.       
+                Get-SqlData -instanceName $instance -Path $SQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery
+                
+                $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
+                
+                $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+                
+              
+                # Add the SQL configuration to the global variable.
+                $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance
+                $sqlVersionConfig += $config
+              }
+              elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
+              {
+                # If the connection to the SQL instance is successful, call the Get-SQLData function.       
+                Get-SqlData -instanceName $instance -Path $SQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery -Credential $sqlCred
+                
+                $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
+                $edition.ConnectionContext.LoginSecure=$false
+                $edition.ConnectionContext.set_Login($sqlCred.UserName)
+                $edition.ConnectionContext.set_SecurePassword($sqlCred.Password)
+                
+                $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+              
+                # Add the SQL configuration to the global variable.
+                $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
+                $sqlVersionConfig += $config
+              }
+              else
+              {
+                  $errorDateTime1 = get-date -f MM-dd-yyyy_hh.mm.ss
+                  $testConnectMsg = "<$errorDateTime1> - No connection could be made to $instance . Authentication or network issue?"
+                  Write-host $testConnectMsg -foregroundcolor "magenta"
+                  $testConnectMsg | Out-File -FilePath $failedConnections -Append
+              }
 
             }
         }
@@ -424,9 +571,6 @@ else
 }
 
 
-# Write-Host "Press any key to continue ..."
-# $x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-Get-Job
 Stop-Transcript
 
 # Other stuff TO-DO:

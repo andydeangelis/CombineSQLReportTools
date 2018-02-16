@@ -26,14 +26,23 @@ function Get-SQLData
   Param(
       [parameter(Mandatory=$true,ValueFromPipeline=$True)] $instanceName,
       [parameter(Mandatory=$true,ValueFromPipeline=$True)] $Path,
-      [parameter(Mandatory=$false,ValueFromPipeline=$True)] $SQLQueryFile
+      [parameter(Mandatory=$false,ValueFromPipeline=$True)] $SQLQueryFile,
+      [parameter(Mandatory=$false,ValueFromPipeline=$True)] $Credential
   )
 
   # Create variable that we will populate with the resultant set of data from the SQL queries.
   
   write-host "Instance name is $instanceName" -ForegroundColor Green
   
-  $SQLDataresult = invoke-sqlcmd -InputFile $SQLQueryFile -serverinstance $instanceName -database master
+  if ($Credential -ne $null)
+  {
+    $SQLDataresult = invoke-sqlcmd2 -InputFile $SQLQueryFile -serverinstance $instanceName -database master -credential $Credential
+  }
+  else
+  {
+    $SQLDataresult = invoke-sqlcmd2 -InputFile $SQLQueryFile -serverinstance $instanceName -database master
+  }
+  
   
   #The following DbaTools function is erroring out. Will use the aboce T-SQL script for now until I figure out the issue.
   # $SQLDataresult = Get-DbaDatabase -SqlInstance $instanceName

@@ -627,5 +627,3 @@ PRINT SUBSTRING(@OtherProduct,2,800)
 PRINT CHAR(13)
 PRINT 'For additional information about supported version and edition upgrades refer to:' 
       + CHAR(13) +'https://technet.microsoft.com/en-us/library/ms143393(v=sql.120).aspx'
-GO
- 

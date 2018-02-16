@@ -64,4 +64,3 @@ JOIN sys.master_files AS [mf]
 JOIN sys.databases AS [rm]
        ON [vfs].[database_id] = [rm].[database_id]
 ORDER BY [vfs].[database_id] ASC;
-GO

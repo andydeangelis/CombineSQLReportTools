@@ -5,7 +5,7 @@
 #    Descrfiption: 
 #         This is a replacement for the Get-SQLInstances function within the SQLPS module. The included Get-SQLInstances function is
 #         primarily for Azure SQL instances and requires the SQL Cloud Adapter, which doesn't really work. The idea is to pass a host
-#         name and return the names of all SQL instances on the host name. It's not elegant, and will be re-written to use WMI eventually.
+#         name and return the names of all SQL instances on the host name. It's not elegant, but it works.
 #    Usage: 
 #           - Simple; source the function and pass the host name as the parameter.
 #
@@ -21,11 +21,12 @@ function Get-SQLInstances02
 {
     # This is the -Computername parameter passed from the PS_SQL_DB_Info.ps1 script, hence the 'ValueFromPipeline' definition.
     Param(
-        [parameter(Mandatory=$true,ValueFromPipeline=$True)] [string[]]$ComputerName
+        [parameter(Mandatory=$true,ValueFromPipeline=$True)] [string[]]$ComputerName,
+        [parameter(Mandatory=$false,ValueFromPipeline=$True)] $Credential
     )
 
-    # Generate instances on target machine from service list. Not the most elegant, but if the SQL Browser Service isn't running, we can't use the GetDataSources method.
-    # Should probably change this to use WMI instead of the Get-Service cmdlet.
+    $instanceNames = @()
+    
      
     if(Test-Connection $ComputerName -Count 2 -Quiet)
     {
@@ -66,14 +67,34 @@ function Get-SQLInstances02
             $instanceName = "$Computername\" + $instance.InstanceName
             # Write-Host $instanceName -ForegroundColor Green
         }
-        # For the SQL instance, create a new SQL Management Object to retrieve data and connect.
+        
+        $instanceNames += $instanceName
+        
+        <# if ($Credential -eq $null)
+            {
+            # For the SQL instance, create a new SQL Management Object to retrieve data and connect.
 
-        $svr = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instanceName
-        # $svr | get-member
+            $svr = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instanceName
+            # $svr | get-member
 
-        # Return the listed data. There are more members available, so this can be modified if need be.
-        # $svr | Select-Object Name
-        $svr | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+            # Return the listed data. There are more members available, so this can be modified if need be.
+            # $svr | Select-Object Name
+            $svr | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+            }
+            else
+            {
+            $svr = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instanceName
+          
+            $svr.ConnectionContext.LoginSecure=$false
+            $svr.ConnectionContext.set_Login($Credential.UserName)
+            $svr.ConnectionContext.set_SecurePassword($Credential.Password)
+
+            # Return the listed data. There are more members available, so this can be modified if need be.
+            # $svr | Select-Object Name
+            $svr | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+        } /#>
       } 
+      
+      return $instanceNames
 }
  
