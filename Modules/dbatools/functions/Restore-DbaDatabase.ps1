@@ -15,6 +15,12 @@ function Restore-DbaDatabase {
         Various means can be used to pass in a list of files to be considered. The default is to non recursively scan the folder
         passed in.
 
+    .PARAMETER SqlInstance
+        The SQL Server instance to restore to.
+
+    .PARAMETER SqlCredential
+        Allows you to login to servers using SQL Logins as opposed to Windows Auth/Integrated/Trusted.
+
     .PARAMETER Path
         Path to SQL Server backup files.
 
@@ -23,12 +29,6 @@ function Restore-DbaDatabase {
 
         Or it can consist of FileInfo objects, such as the output of Get-ChildItem or Get-Item. This allows you to work with
         your own filestructures as needed
-
-    .PARAMETER SqlInstance
-        The SQL Server instance to restore to.
-
-    .PARAMETER SqlCredential
-        Allows you to login to servers using SQL Logins as opposed to Windows Auth/Integrated/Trusted.
 
     .PARAMETER DatabaseName
         Name to restore the database under.
@@ -98,7 +98,7 @@ function Restore-DbaDatabase {
 
         This will apply to all file move options, except for FileMapping
 
-    .PARAMETER RestoredDatababaseNamePrefix
+    .PARAMETER RestoredDatabaseNamePrefix
         A string which will be prefixed to the start of the restore Database's Name
         Useful if restoring a copy to the same sql server for testing.
 
@@ -134,7 +134,7 @@ function Restore-DbaDatabase {
         The name of the SQL Server credential to be used if restoring from an Azure hosted backup
 
     .PARAMETER ReplaceDbNameInFile
-        If switch set and occurence of the original database's name in a data or log file will be replace with the name specified in the Databasename paramter
+        If switch set and occurence of the original database's name in a data or log file will be replace with the name specified in the Databasename parameter
 
     .PARAMETER Recover
         If set will perform recovery on the indicated database
@@ -295,13 +295,13 @@ function Restore-DbaDatabase {
 #>
     [CmdletBinding(SupportsShouldProcess = $true, DefaultParameterSetName = "Restore")]
     param (
-        [parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = "Restore")]
-        [parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = "RestorePage")]
-        [object[]]$Path,
         [parameter(Mandatory = $true)]
         [Alias("ServerInstance", "SqlServer")]
         [DbaInstanceParameter]$SqlInstance,
         [PSCredential]$SqlCredential,
+        [parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = "Restore")]
+        [parameter(Mandatory = $true, ValueFromPipeline = $true, ParameterSetName = "RestorePage")]
+        [object[]]$Path,
         [parameter(ValueFromPipeline = $true)]
         [Alias("Name")]
         [object[]]$DatabaseName,
@@ -335,7 +335,8 @@ function Restore-DbaDatabase {
         [parameter(ParameterSetName = "Restore")]
         [string]$DestinationFilePrefix = '',
         [parameter(ParameterSetName = "Restore")]
-        [string]$RestoredDatababaseNamePrefix,
+        [Alias("RestoredDatababaseNamePrefix")]
+        [string]$RestoredDatabaseNamePrefix,
         [parameter(ParameterSetName = "Restore")]
         [parameter(ParameterSetName = "RestorePage")]
         [switch]$TrustDbBackupHistory,
@@ -592,6 +593,10 @@ function Restore-DbaDatabase {
     end {
         if (Test-FunctionInterrupt) { return }
         if ($PSCmdlet.ParameterSetName -like "Restore*") {
+            if ($BackupHistory.Count -eq 0) {
+                Write-Message -Level Warning -Message "No backups passed through. `n This could mean the SQL instance cannot see the referenced files, the file's headers could not be read or some other issue"
+                return
+            }
             Write-Message -message "Processing DatabaseName - $DatabaseName" -Level Verbose
             $FilteredBackupHistory = @()
             if (Test-Bound -ParameterName GetBackupInformation) {
@@ -613,7 +618,7 @@ function Restore-DbaDatabase {
                 return
             }
 
-            $null = $FilteredBackupHistory | Format-DbaBackupInformation -DataFileDirectory $DestinationDataDirectory -LogFileDirectory $DestinationLogDirectory -DestinationFileStreamDirectory $DestinationFileStreamDirectory -DatabaseFileSuffix $DestinationFileSuffix -DatabaseFilePrefix $DestinationFilePrefix -DatabaseNamePrefix $RestoredDatababaseNamePrefix -ReplaceDatabaseName $DatabaseName -Continue:$Continue -ReplaceDbNameInFile:$ReplaceDbNameInFile -FileMapping $FileMapping
+            $null = $FilteredBackupHistory | Format-DbaBackupInformation -DataFileDirectory $DestinationDataDirectory -LogFileDirectory $DestinationLogDirectory -DestinationFileStreamDirectory $DestinationFileStreamDirectory -DatabaseFileSuffix $DestinationFileSuffix -DatabaseFilePrefix $DestinationFilePrefix -DatabaseNamePrefix $RestoredDatabaseNamePrefix -ReplaceDatabaseName $DatabaseName -Continue:$Continue -ReplaceDbNameInFile:$ReplaceDbNameInFile -FileMapping $FileMapping
 
             if ( Test-Bound -ParameterName FormatBackupInformation) {
                 Set-Variable -Name $FormatBackupInformation -Value $FilteredBackupHistory -Scope Global

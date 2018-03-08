@@ -50,7 +50,7 @@ function Copy-DbaDatabase {
             Specifies the network location for the backup files. The SQL Server service accounts must have read/write permission on this path.
 
         .PARAMETER WithReplace
-            If this switch is enabled, the restore is executed with WITH REPLACE. This is useful if you want to stage some complex file paths.
+            If this switch is enabled, the restore is executed with WITH REPLACE.
 
         .PARAMETER NoRecovery
             If this switch is enabled, the restore is executed with WITH NORECOVERY. Ideal for staging.
@@ -506,7 +506,7 @@ function Copy-DbaDatabase {
                 $dbOwner
             )
 
-            if ($server.Logins.Item($dbOwner) -eq $null) {
+            if ($null -eq $server.Logins.Item($dbOwner)) {
                 try {
                     $dbOwner = ($destServer.logins | Where-Object { $_.id -eq 1 }).Name
                 }
@@ -615,7 +615,7 @@ function Copy-DbaDatabase {
             $sourceFileStructure = New-Object System.Collections.Specialized.StringCollection
             $dbOwner = $sourceServer.databases[$dbName].owner
 
-            if ($dbOwner -eq $null) {
+            if ($null -eq $dbOwner) {
                 try {
                     $dbOwner = ($destServer.logins | Where-Object { $_.id -eq 1 }).Name
                 }
@@ -997,7 +997,7 @@ function Copy-DbaDatabase {
                     continue
                 }
 
-                if (($destServer.Databases[$dbName] -ne $null) -and !$force -and !$WithReplace) {
+                if (($null -ne $destServer.Databases[$dbName]) -and !$force -and !$WithReplace) {
                     Write-Message -Level Verbose -Message "Database exists at destination. Use -Force to drop and migrate. Aborting routine for this database."
 
                     $copyDatabaseStatus.Status = "Skipped"
@@ -1005,7 +1005,7 @@ function Copy-DbaDatabase {
                     $copyDatabaseStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
                     continue
                 }
-                elseif ($destServer.Databases[$dbName] -ne $null -and $force) {
+                elseif ($null -ne $destServer.Databases[$dbName] -and $force) {
                     if ($Pscmdlet.ShouldProcess($destination, "DROP DATABASE $dbName")) {
                         Write-Message -Level Verbose -Message "$dbName already exists. -Force was specified. Dropping $dbName on $destination."
                         $dropResult = Remove-SqlDatabase $destServer $dbName

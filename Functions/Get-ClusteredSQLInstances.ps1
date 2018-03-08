@@ -4,12 +4,12 @@
     Param(
         [parameter(Mandatory=$true,ValueFromPipeline=$True)] $ClusterNames
     )
-
+    
     foreach ($cluster in $ClusterNames)
     {
       # Get the private properties for the SQL Server cluster resource type.
-      Write-Host $cluster.name -ForegroundColor Yellow
-      $sqlSvrResource = (Get-WmiObject -Namespace root\mscluster -Class MSCluster_Resource -ComputerName $cluster.Name | Where-Object {$_.Type -eq 'SQL Server'} | select -Expand PrivateProperties)
+      # Write-Host $cluster -ForegroundColor Yellow
+      $sqlSvrResource = (Get-WmiObject -Namespace root\mscluster -Class MSCluster_Resource -ComputerName $cluster | Where-Object {$_.Type -eq 'SQL Server'} | select -Expand PrivateProperties)
       
       If ($sqlSvrResource -ne $null)
       {
@@ -24,7 +24,7 @@
       }
       else
       {
-        Write-Host $cluster.Name "is clustered but has no clustered SQL services. Is this an Availability Group?" -ForegroundColor DarkYellow
+        Write-Host "$cluster is clustered but has no clustered SQL services. Is this an Availability Group?" -ForegroundColor DarkYellow
         return $false
       }
       

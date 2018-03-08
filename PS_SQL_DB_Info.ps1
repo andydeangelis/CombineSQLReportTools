@@ -105,6 +105,9 @@ $ServerNames = @()
 $sqlConfig = @()
 $sqlVersionConfig = @()
 
+# Create an array that will hold the SQL best practices data.
+$sqlBP = @()
+
 # Output the PowerShell screen text as debug file.
 
 Start-Transcript -Path $logFile
@@ -118,7 +121,7 @@ if ($Servers -ne $null)
 {
   # First, we'll get the server data returned as an array.
 
-  $ServerConfigResult = Get-ServerConfig -ComputerNames $Servers
+  $ServerConfigResult = Get-ServerConfig -ComputerName $Servers
   
   # Next, let's get the disk configuration data. We'll start by declaring the array that we will hold the disk config objects in.
   
@@ -202,15 +205,64 @@ if ($ClusterNames -ne $null)
 
   $clNames = $ClusterNames | Select-Object Name -Unique
 
-  # Pass the new array without duplicates to the Get-ClusterNodes function.
+  # Instantiate an array to hold the core cluster configurations.
+    
+  $clCoreConfig = @()
+    
+  # Instantiate an array to hold the resource config.
+   
+  $clResourceConfig = @()
+  
+  # For each unique name in the $clNames array (each unique cluster name), call the Get-ClusterConfig function to get the core cluster config info, then output the data to a spreadsheet.
 
-  Get-ClusterConfig -ClusterNames $clNames -Path $clClusterConfigxlsxReportPath
+  foreach ($name in $clNames)
+  {
+    $clCoreConfig += Get-ClusterConfig -ClusterName $name.Name
+    $clResources = Get-WmiObject -Namespace root\mscluster -ComputerName $name.Name -Class mscluster_resource | Where-Object {$_.OwnerGroup -ne "Cluster Group"} |
+                        Select-Object OwnerGroup,OwnerNode,CoreResource,Type,IsClusterSharedVolume       
+
+    # Set the worksheet name for the server's config.
+    $clResourceWorksheet = $name.Name + " Resources"
+        
+    # Set the table name for the worksheet.
+    $clResourceTable = "Table" + $name.Name
+        
+    # Export the resources to a new tab in the Excel spreadsheet, one tab per customer.
+        
+    if ($clResources -ne $null)
+    {
+        $excel = $clResources | Export-Excel -Path $clClusterConfigxlsxReportPath -AutoSize -WorksheetName $clResourceWorksheet -FreezeTopRow -TableName $clResourceTable -PassThru        
+        $excel.Save() ; $excel.Dispose()
+    }
+    else
+    {
+        Write-Host "No cluster data found."
+    }
+  }
+
+  # Set the worksheet name. We will have a single tab that will hold each cluster's config for easy reference..
+  
+    $clConfigWorksheet = "Cluster Configs"
+
+    # Set the table names for the worksheet.
+  
+    $clConfigTableName = "ClusterConfigs"
+
+    if ($clCoreConfig -ne $null)
+    {
+        $excel = $clCoreConfig | Export-Excel -Path $clClusterConfigxlsxReportPath -AutoSize -WorksheetName $clConfigWorksheet -FreezeTopRow -TableName $clConfigTableName -PassThru        
+        $excel.Save() ; $excel.Dispose()
+    }
+    else
+    {
+        Write-Host "No cluster data found."
+    }
   
   foreach ($clName in $clNames)
   {
     # Call the Get-ClusterSQLInstances function to get the list of cluster SQL instance names.
   
-    $clSQLInstances = Get-ClusteredSQLInstances -ClusterNames $clName
+    $clSQLInstances = Get-ClusteredSQLInstances -ClusterNames $clName.Name
     
     # If there are no clustereds SQL instances, we'll check to see if these are AGs.
     
@@ -221,7 +273,7 @@ if ($ClusterNames -ne $null)
         
       $clNodes = get-wmiobject -Class MSCluster_node -Namespace root\mscluster -ComputerName $clName.Name | select Name
         
-      # Now that we have the cluster nodes, let's instantiate an array to hold each of the server objects.
+      # Now that we have the cluster nodes, let's instantiate an array to hold each of the server objects. This array is only valid during this loop.
         
       $agConfigResult = @()
 
@@ -279,10 +331,12 @@ if ($ClusterNames -ne $null)
               $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
                               
               $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+              $bpTest = Test-SQLBP -instanceName $instance -ComputerName $node.Name
               
               # Add the SQL configuration to the global variable.
               $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance
               $sqlVersionConfig += $config
+              $sqlBP += $bpTest
               
               # We've gotten all the database information and added to the correct file.
               # Now, we're going to check if there are any Availability Groups present.
@@ -312,10 +366,12 @@ if ($ClusterNames -ne $null)
               $edition.ConnectionContext.set_SecurePassword($sqlCred.Password)
                 
               $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+              $bpTest = Test-SQLBP -instanceName $instance -ComputerName $node.Name -Credential $sqlCred
               
               # Add the SQL configuration to the global variable.
               $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
               $sqlVersionConfig += $config
+              $sqlBP += $bpTest
               
               # We've gotten all the database information and added to the correct file.
               # Now, we're going to check if there are any Availability Groups present.
@@ -406,10 +462,12 @@ if ($ClusterNames -ne $null)
           $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
                 
           $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+          $bpTest = Test-SQLBP -instanceName $instance -ComputerName $clName.Name -IsClustered $true
               
           # Add the SQL configuration to the global variable.
           $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance
           $sqlVersionConfig += $config
+          $sqlBP += $bptest
         }
         elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
         {
@@ -422,10 +480,12 @@ if ($ClusterNames -ne $null)
           $edition.ConnectionContext.set_SecurePassword($sqlCred.Password)
                 
           $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+          $bpTest = Test-SQLBP -instanceName $instance -ComputerName $clName.Name -Credential $sqlCred -IsClustered $true
               
           # Add the SQL configuration to the global variable.
           $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
           $sqlVersionConfig += $config
+          $sqlBP += $bpTest
         }        
         else
         {
@@ -505,10 +565,12 @@ foreach ($server in $ServerNames)
                 
                 $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
                 
+                $bpTest = Test-SQLBP -instanceName $instance -ComputerName $server                
               
                 # Add the SQL configuration to the global variable.
                 $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance
                 $sqlVersionConfig += $config
+                $sqlBP += $bpTest
               }
               elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
               {
@@ -521,10 +583,13 @@ foreach ($server in $ServerNames)
                 $edition.ConnectionContext.set_SecurePassword($sqlCred.Password)
                 
                 $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+                
+                $bpTest = Test-SQLBP -instanceName $instance -ComputerName $server -Credential $sqlCred
               
                 # Add the SQL configuration to the global variable.
                 $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
                 $sqlVersionConfig += $config
+                $sqlBP += $bpTest
               }
               else
               {
@@ -548,7 +613,7 @@ foreach ($server in $ServerNames)
 
 }
 
-# As a last step, we will export all SQL server config data to a different spreadsheet.
+# As a last step, we will export all SQL server config and best practices data to a different spreadsheet.
 
 $sqlConfigWorksheet = "SQL Configs"
 $sqlConfigTable = "SQL_SP_Configs"
@@ -556,29 +621,31 @@ $sqlConfigTable = "SQL_SP_Configs"
 $sqlVersionConfigWorksheet = "SQL Versions"
 $sqlVersionConfigTable = "SQLVersionConfigs"
 
+$sqlBPWorksheet = "SQL Best Practices"
+$sqlBPTable = "SQLBestPractices"
+
 $sqlConfigSpreadsheet =  "$targetPath\sqlConfig-$datetime.xlsx"
 
-if ($sqlConfig -ne $null)
+if (($sqlConfig -ne $null) -and ($sqlBP -ne $null))
 {
   $excel2 = $sqlVersionConfig | Export-Excel -Path $sqlConfigSpreadsheet -Autosize -Worksheet $sqlVersionConfigWorksheet -FreezeTopRow -TableStyle 'Medium6' -TableName $sqlVersionConfigTable -PassThru
   $excel2.Save() ; $excel2.Dispose()
   $excel = $sqlConfig | Export-Excel -Path $sqlConfigSpreadsheet -AutoSize -WorksheetName $sqlConfigWorksheet -FreezeTopRow -TableStyle 'Medium6' -TableName $sqlConfigTable -PassThru
   $excel.Save() ; $excel.Dispose()
+  # $excel3 = $sqlBP | Export-Excel -Path $sqlConfigSpreadsheet -AutoSize -WorksheetName $sqlBPWorksheet -FreezeTopRow -TableStyle 'Medium6' -TableName $sqlBPTable -PassThru
+  # $excel3.Save(); $excel3.Dispose()
 }
 else
 {
   Write-Host "No SQL Data to export." -ForegroundColor Red
 }
 
-
+$sqlBP | Out-File -FilePath "$targetPath\BestPractice.txt"
+Read-Host -Prompt "Press any key to continue"
 Stop-Transcript
 
 # Other stuff TO-DO:
 #
 #     - Add error handling.
-#     - Add credential parameter to specify SQL logon credentials.
-#     - Add script auto-elevation prompt.
 #     - Add optional parameter to scan Active Directory domain/OU for SQL servers (instead of using an array or file). 
 #                  - Note: This requires customers to have their own domain. 
-#     - Determine if we can use an Excel portable dll to create spreadsheets/pivot tables.
-#     - Add date time stamp to files for historical records.

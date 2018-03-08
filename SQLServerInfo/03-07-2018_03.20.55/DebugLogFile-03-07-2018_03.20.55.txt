@@ -1,0 +1,116 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20180307152056
+Username: ANDYHOME\dalthakar
+RunAs User: ANDYHOME\dalthakar
+Configuration Name: 
+Machine: ANDY-W10-02 (Microsoft Windows NT 10.0.16299.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -executionpolicy bypass -windowstyle normal -nologo -file C:\Scripts\CombineSQLReportTools\PS_SQL_DB_Info.ps1
+Process ID: 7920
+PSVersion: 5.1.16299.248
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.16299.248
+BuildVersion: 10.0.16299.248
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is C:\Scripts\CombineSQLReportTools\SQLServerInfo\03-07-2018_03.20.55\DebugLogFile-03-07-2018_03.20.55.txt
+Server ANDY-2K16-19 is online. Checking OS...
+Server ANDY-2K16-19 is Windows. Checking cluster membership...
+Server ANDY-2K16-21 is online. Checking OS...
+Server ANDY-2K16-21 is Windows. Checking cluster membership...
+Server ANDY-2K16-19 is clustered.
+Server ANDY-2K16-21 is clustered.
+@{Name=andy-sqlcl}
+
+Get-WmiObject : The RPC server is unavailable. (Exception from HRESULT: 0x800706BA)
+At C:\Scripts\CombineSQLReportTools\Functions\Get-ClusterConfig.ps1:36 char:19
++ ...   $clData = Get-WmiObject -Namespace root\mscluster -ComputerName $Cl ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], COMException
+    + FullyQualifiedErrorId : GetWMICOMException,Microsoft.PowerShell.Commands.GetWmiObjectCommand
+Get-WmiObject : The RPC server is unavailable. (Exception from HRESULT: 0x800706BA)
+At C:\Scripts\CombineSQLReportTools\Functions\Get-ClusterConfig.ps1:36 char:19
++ ...   $clData = Get-WmiObject -Namespace root\mscluster -ComputerName $Cl ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], COMException
+    + FullyQualifiedErrorId : GetWMICOMException,Microsoft.PowerShell.Commands.GetWmiObjectCommand
+
+Get-WmiObject : The RPC server is unavailable. (Exception from HRESULT: 0x800706BA)
+At C:\Scripts\CombineSQLReportTools\Functions\Get-ClusterConfig.ps1:39 char:22
++ ... clCoreDNS = Get-WmiObject -Namespace root\mscluster -ComputerName $Cl ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], COMException
+    + FullyQualifiedErrorId : GetWMICOMException,Microsoft.PowerShell.Commands.GetWmiObjectCommand
+Get-WmiObject : The RPC server is unavailable. (Exception from HRESULT: 0x800706BA)
+At C:\Scripts\CombineSQLReportTools\Functions\Get-ClusterConfig.ps1:39 char:22
++ ... clCoreDNS = Get-WmiObject -Namespace root\mscluster -ComputerName $Cl ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], COMException
+    + FullyQualifiedErrorId : GetWMICOMException,Microsoft.PowerShell.Commands.GetWmiObjectCommand
+
+Get-WmiObject : The RPC server is unavailable. (Exception from HRESULT: 0x800706BA)
+At C:\Scripts\CombineSQLReportTools\Functions\Get-ClusterConfig.ps1:44 char:21
++ ... $clCoreIP = Get-WmiObject -Namespace root\mscluster -ComputerName $Cl ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], COMException
+    + FullyQualifiedErrorId : GetWMICOMException,Microsoft.PowerShell.Commands.GetWmiObjectCommand
+Get-WmiObject : The RPC server is unavailable. (Exception from HRESULT: 0x800706BA)
+At C:\Scripts\CombineSQLReportTools\Functions\Get-ClusterConfig.ps1:44 char:21
++ ... $clCoreIP = Get-WmiObject -Namespace root\mscluster -ComputerName $Cl ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], COMException
+    + FullyQualifiedErrorId : GetWMICOMException,Microsoft.PowerShell.Commands.GetWmiObjectCommand
+
+Get-WmiObject : The RPC server is unavailable. (Exception from HRESULT: 0x800706BA)
+At C:\Scripts\CombineSQLReportTools\PS_SQL_DB_Info.ps1:223 char:20
++ ... Resources = Get-WmiObject -Namespace root\mscluster -ComputerName $na ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], COMException
+    + FullyQualifiedErrorId : GetWMICOMException,Microsoft.PowerShell.Commands.GetWmiObjectCommand
+Get-WmiObject : The RPC server is unavailable. (Exception from HRESULT: 0x800706BA)
+At C:\Scripts\CombineSQLReportTools\PS_SQL_DB_Info.ps1:223 char:20
++ ... Resources = Get-WmiObject -Namespace root\mscluster -ComputerName $na ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [Get-WmiObject], COMException
+    + FullyQualifiedErrorId : GetWMICOMException,Microsoft.PowerShell.Commands.GetWmiObjectCommand
+
+Method invocation failed because [System.Management.Automation.PSObject] does not contain a method named 'op_Addition'.
+At C:\Scripts\CombineSQLReportTools\PS_SQL_DB_Info.ps1:227 char:5
++     $clResourceWorksheet = $name + " Resources"
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (op_Addition:String) [], RuntimeException
+    + FullyQualifiedErrorId : MethodNotFound
+Method invocation failed because [System.Management.Automation.PSObject] does not contain a method named 'op_Addition'.
+At C:\Scripts\CombineSQLReportTools\PS_SQL_DB_Info.ps1:227 char:5
++     $clResourceWorksheet = $name + " Resources"
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (op_Addition:String) [], RuntimeException
+    + FullyQualifiedErrorId : MethodNotFound
+
+No cluster data found.
+andy-sqlcl is clustered but has no clustered SQL services. Is this an Availability Group?
+SQL Instances have been found.
+Instance name is ANDY-2K16-21\MSSQL01
+TANDY-2K16-21-MSSQL01
+Instance name is ANDY-2K16-21\MSSQL01
+Using Host Name ANDY-2K16-21
+SQL Instances have been found.
+Instance name is ANDY-2K16-19\MSSQL02
+TANDY-2K16-19-MSSQL02
+Instance name is ANDY-2K16-19\MSSQL02
+Using Host Name ANDY-2K16-19
+Instance name is ANDY-2K16-19\MSSQL03
+TANDY-2K16-19-MSSQL03
+Instance name is ANDY-2K16-19\MSSQL03
+Using Host Name ANDY-2K16-19
+WARNING: [Get-DbaAvailabilityGroup][15:21:46] Availability Group (HADR) is not configured for the instance: ANDY-2K16-19\MSSQL03.
+PS>TerminatingError(): "System error."
+No availability groups have been found.
+
+**********************
+Windows PowerShell transcript end
+End time: 20180308093944
+**********************

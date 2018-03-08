@@ -21,7 +21,13 @@ namespace Sqlcollaborative.Dbatools.Parameter
         [ParameterContract(ParameterContractType.Field, ParameterContractBehavior.Mandatory)]
         public string ComputerName
         {
-            get { return _ComputerName; }
+            get
+            {
+                // Pretend to be localhost for all non-sql functions
+                if (_ComputerName == "(localdb)")
+                    return "localhost";
+                return _ComputerName;
+            }
         }
 
         /// <summary>
@@ -72,6 +78,9 @@ namespace Sqlcollaborative.Dbatools.Parameter
         {
             get
             {
+                // Pretend to be localhost for all non-sql functions
+                if (_ComputerName == "(localdb)")
+                    return true;
                 return Utility.Validation.IsLocalhost(_ComputerName);
             }
         }
@@ -149,7 +158,7 @@ namespace Sqlcollaborative.Dbatools.Parameter
         /// Whether the input is a connection string
         /// </summary>
         [ParameterContract(ParameterContractType.Field, ParameterContractBehavior.Mandatory)]
-        public bool IsConnectionString { get; private set; } //TODO: figure out how to not limit ourselves to .NET 4.0
+        public bool IsConnectionString { get; private set; }
 
         /// <summary>
         /// The original object passed to the parameter class.
@@ -325,10 +334,6 @@ namespace Sqlcollaborative.Dbatools.Parameter
             }
             catch { }
 
-            // Handle localfile dbs, both shared and unshared
-            if (UtilityHost.IsLike(tempString, @"(localdb)\*"))
-                tempString = Regex.Replace((Regex.Replace(tempString, @"^\(localdb\)\\\.", "localhost", RegexOptions.IgnoreCase)), @"^\(localdb\)", "localhost", RegexOptions.IgnoreCase);
-
             // Handle and clear protocols. Otherwise it'd make port detection unneccessarily messy
             if (Regex.IsMatch(tempString, "^TCP:", RegexOptions.IgnoreCase)) //TODO: Use case insinsitive String.BeginsWith()
             {
@@ -420,9 +425,13 @@ namespace Sqlcollaborative.Dbatools.Parameter
                     }
                 }
 
-                if (Utility.Validation.IsValidComputerTarget(tempComputerName) && Utility.Validation.IsValidInstanceName(tempInstanceName, true))
+                // LocalDBs mostly ignore regular Instance Name rules, so that validation is only relevant for regular connections
+                if (UtilityHost.IsLike(tempComputerName, "(localdb)") || (Utility.Validation.IsValidComputerTarget(tempComputerName) && Utility.Validation.IsValidInstanceName(tempInstanceName, true)))
                 {
-                    _ComputerName = tempComputerName;
+                    if (UtilityHost.IsLike(tempComputerName, "(localdb)"))
+                        _ComputerName = "(localdb)";
+                    else
+                        _ComputerName = tempComputerName;
                     if ((tempInstanceName.ToLower() != "default") && (tempInstanceName.ToLower() != "mssqlserver"))
                         _InstanceName = tempInstanceName;
                 }
@@ -508,8 +517,15 @@ namespace Sqlcollaborative.Dbatools.Parameter
                 case "microsoft.sqlserver.management.smo.server":
                     try
                     {
-                        if (tempInput.Properties["NetName"] != null) { _ComputerName = (string)tempInput.Properties["NetName"].Value; }
-                        else { _ComputerName = (new DbaInstanceParameter((string)tempInput.Properties["DomainInstanceName"].Value)).ComputerName; }
+                        if (tempInput.Properties["ServerType"] != null && (string)tempInput.Properties["ServerType"].Value.ToString() == "SqlAzureDatabase")
+                            _ComputerName = (new DbaInstanceParameter((string)tempInput.Properties["Name"].Value)).ComputerName;
+                        else
+                        { 
+                            if (tempInput.Properties["NetName"] != null)
+                                _ComputerName = (string)tempInput.Properties["NetName"].Value;
+                            else
+                                _ComputerName = (new DbaInstanceParameter((string)tempInput.Properties["DomainInstanceName"].Value)).ComputerName;
+                        }
                         _InstanceName = (string)tempInput.Properties["InstanceName"].Value;
                         PSObject tempObject = new PSObject(tempInput.Properties["ConnectionContext"].Value);
 

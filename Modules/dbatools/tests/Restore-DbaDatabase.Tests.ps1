@@ -7,7 +7,7 @@ Describe "$CommandName Integration Tests" -Tags "IntegrationTests" {
     $DataFolder = 'c:\temp\datafiles'
     $LogFolder = 'C:\temp\logfiles'
     New-Item -Type Directory $DataFolder -ErrorAction SilentlyContinue
-    new-Item -Type Directory $LogFolder -ErrorAction SilentlyContinue
+    New-Item -Type Directory $LogFolder -ErrorAction SilentlyContinue
 
     Context "Properly restores a database on the local drive using Path" {
         $null = Get-DbaDatabase -SqlInstance $script:instance1 -NoSystemDb | Remove-DbaDatabase -Confirm:$false
@@ -196,8 +196,26 @@ Describe "$CommandName Integration Tests" -Tags "IntegrationTests" {
     Start-Sleep -Seconds 5
     Clear-DbaSqlConnectionPool
 
-    Context "Properly restores an instance using ola-style backups" {
+    Context "Properly restores an instance using ola-style backups via pipe" {
         $results = Get-ChildItem $script:appveyorlabrepo\sql2008-backups | Restore-DbaDatabase -SqlInstance $script:instance1
+        It "Restored files count should be the right number" {
+            $results.DatabaseName.Count | Should Be 26
+        }
+        It "Should return successful restore" {
+            ($results.RestoreComplete -contains $false) | Should Be $false
+            ($results.count -gt 0) | Should be $True
+        }
+    }
+
+    Context "Database is properly removed again after ola pipe test" {
+        $results = Get-DbaDatabase -SqlInstance $script:instance1 -NoSystemDb | Remove-DbaDatabase -Confirm:$false
+        It "Should say the status was dropped" {
+            $results | ForEach-Object { $_.Status | Should Be "Dropped" }
+        }
+    }
+
+    Context "Properly restores an instance using ola-style backups via string" {
+        $results = Restore-DbaDatabase -SqlInstance $script:instance1 -Path $script:appveyorlabrepo\sql2008-backups
         It "Restored files count should be the right number" {
             $results.DatabaseName.Count | Should Be 26
         }
@@ -276,6 +294,16 @@ Describe "$CommandName Integration Tests" -Tags "IntegrationTests" {
     Start-Sleep -Seconds 1
 
     Context "RestoreTime point in time and continue" {
+        AfterAll {
+            $null = Get-DbaDatabase -SqlInstance $script:instance1 -NoSystemDb | Remove-DbaDatabase -Confirm:$false
+        }
+        $Should_Run = (Connect-DbaInstance -SqlInstance $script:instance1).Version.ToString() -like '10.50*'
+        if (-not($Should_Run)) {
+            It "The test can run" {
+                Set-TestInconclusive -Message "a 2008R2 is strictly needed"
+            }
+            return
+        }
         $results = Restore-DbaDatabase -SqlInstance $script:instance1 -path $script:appveyorlabrepo\RestoreTimeClean -RestoreTime (get-date "2017-06-01 13:22:44") -StandbyDirectory c:\temp
         $sqlResults = Invoke-Sqlcmd2 -ServerInstance $script:instance1 -Query "select convert(datetime,convert(varchar(20),max(dt),120)) as maxdt, convert(datetime,convert(varchar(20),min(dt),120)) as mindt from RestoreTimeClean.dbo.steps"
         It "Should have restored 4 files" {
@@ -302,6 +330,7 @@ Describe "$CommandName Integration Tests" -Tags "IntegrationTests" {
     }
 
     Context "Backup DB For next test" {
+        $null = Restore-DbaDatabase -SqlInstance $script:instance1 -path $script:appveyorlabrepo\RestoreTimeClean -RestoreTime (get-date "2017-06-01 13:22:44")
         $results = Backup-DbaDatabase -SqlInstance $script:instance1 -Database RestoreTimeClean -BackupDirectory C:\temp
         It "Should return successful backup" {
             $results.BackupComplete | Should Be $true
@@ -511,7 +540,7 @@ Describe "$CommandName Integration Tests" -Tags "IntegrationTests" {
 
     Context "Page level restores" {
         Get-DbaDatabase -SqlInstance $script:instance1 -ExcludeAllSystemDb | Remove-DbaDatabase -confirm:$false
-        $results = Restore-DbaDatabase -SqlInstance $script:instance1 -Path $script:appveyorlabrepo\singlerestore\singlerestore.bak -DatabaseName PageRestore -DestinationFilePrefix PageRestore
+        $null = Restore-DbaDatabase -SqlInstance $script:instance1 -Path $script:appveyorlabrepo\singlerestore\singlerestore.bak -DatabaseName PageRestore -DestinationFilePrefix PageRestore
         $sql = "alter database PageRestore set Recovery Full
         Create table testpage(
             Filler char(8000)
@@ -563,7 +592,7 @@ Describe "$CommandName Integration Tests" -Tags "IntegrationTests" {
 
         insert into testpage values (REPLICATE('f','8000'))
         use master"
-        $sqlResults = Invoke-Sqlcmd2 -ServerInstance $script:instance1 -Query $sql -Database Pagerestore
+        $null = Invoke-Sqlcmd2 -ServerInstance $script:instance1 -Query $sql -Database Pagerestore
         $sqlResults2 = Invoke-SqlCmd2 -ServerInstance $script:instance1 -Database Master -Query "select * from pagerestore.dbo.testpage where filler like 'a%'" -ErrorVariable errvar -ErrorAction SilentlyContinue
         It "Should have warned about corruption" {
             ($errvar -match "SQL Server detected a logical consistency-based I/O error: incorrect checksum \(expected") | Should be $True

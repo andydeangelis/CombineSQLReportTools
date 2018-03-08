@@ -26,7 +26,7 @@ function Get-SQLData
   Param(
       [parameter(Mandatory=$true,ValueFromPipeline=$True)] $instanceName,
       [parameter(Mandatory=$true,ValueFromPipeline=$True)] $Path,
-      [parameter(Mandatory=$false,ValueFromPipeline=$True)] $SQLQueryFile,
+      [parameter(Mandatory=$true,ValueFromPipeline=$True)] $SQLQueryFile,
       [parameter(Mandatory=$false,ValueFromPipeline=$True)] $Credential
   )
 

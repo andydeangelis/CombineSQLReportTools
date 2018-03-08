@@ -27,7 +27,12 @@ function Test-DbaFullRecoveryModel {
             Specifies the database(s) to exclude from processing. Options for this list are auto-populated from the server.
 
         .PARAMETER Detailed
-            If this switch is enabled, an additional "Notes" column is returned in the results.
+            Output all properties, will be deprecated in 1.0.0 release.
+
+        .PARAMETER EnableException
+            By default, when something goes wrong we try to catch it, interpret it and give you a friendly warning message.
+            This avoids overwhelming you with "sea of red" exceptions, but is inconvenient because it basically disables advanced scripting.
+            Using this switch turns this "nice by default" feature off and enables you to catch exceptions with your own try/catch.
 
         .NOTES
             Tags: DisasterRecovery, Backup
@@ -54,6 +59,11 @@ function Test-DbaFullRecoveryModel {
             Test-DbaFullRecoveryModel -SqlInstance sql2008 | Sort-Object Server, ActualRecoveryModel -Descending
 
             Shows all databases where the configured recovery model is FULL and indicates whether or not they are really in FULL recovery model. The Sort-Object will cause the databases in 'pseudo-simple' mode to show first.
+        
+        .EXAMPLE
+            Test-DbaFullRecoveryModel -SqlInstance localhost | Select-Object -Property *
+
+            Shows all of the properties for the databases that have Full Recovery Model
     #>
     [CmdletBinding()]
     [OutputType("System.Collections.ArrayList")]
@@ -65,24 +75,16 @@ function Test-DbaFullRecoveryModel {
         [object[]]$Database,
         [object[]]$ExcludeDatabase,
         [PSCredential]$SqlCredential,
-        [switch]$Detailed
+        [switch]$Detailed,
+        [switch][Alias('Silent')]
+        $EnableException
     )
-
     begin {
-        $collection = New-Object System.Collections.ArrayList
-    }
-
-    process {
-        foreach ($servername in $SqlInstance) {
-            try {
-                $server = Connect-SqlInstance -SqlInstance $servername -SqlCredential $SqlCredential
-
-                if ($server.versionMajor -lt 9) {
-                    Write-Warning "This function does not support versions lower than SQL Server 2005 (v9). Skipping server '$servername'."
-                    continue
-                }
-
-                $sqlRecoveryModel = "SELECT '$($server.Name)' AS 'Server'
+        Test-DbaDeprecation -DeprecatedOn 1.0.0 -Parameter Detailed
+        
+        $sqlRecoveryModel = "SELECT  SERVERPROPERTY('MachineName') AS ComputerName,
+                ISNULL(SERVERPROPERTY('InstanceName'), 'MSSQLSERVER') AS InstanceName,
+                SERVERPROPERTY('ServerName') AS SqlInstance
                         , d.[name] AS [Database]
                         , d.recovery_model AS RecoveryModel
                         , d.recovery_model_desc AS RecoveryModelDesc
@@ -94,59 +96,61 @@ function Test-DbaFullRecoveryModel {
                     INNER JOIN sys.database_recovery_status AS drs
                        ON D.database_id = drs.database_id
                   WHERE d.recovery_model = 1"
-
-                if ($Database) {
-                    $dblist = $Database -join "','"
-                    $databasefilter += "AND d.[name] in ('$dblist')"
+        
+        if ($Database) {
+            $dblist = $Database -join "','"
+            $databasefilter += "AND d.[name] in ('$dblist')"
+        }
+        if ($ExcludeDatabase) {
+            $dblist = $ExcludeDatabase -join "','"
+            $databasefilter += "AND d.[name] NOT IN ('$dblist')"
+        }
+        
+        $sql = "$sqlRecoveryModel $databasefilter"
+        
+        Write-Message -Level Debug -Message $sql
+    }
+    process {
+        foreach ($instance in $SqlInstance) {
+            try {
+                Write-Message -Level Verbose -Message "Connecting to $instance."
+                $server = Connect-SqlInstance -SqlInstance $instance -SqlCredential $sqlcredential -MinimumVersion 9
+            }
+            catch {
+                Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue
+            }
+            
+            try {
+                $recoverymodel = $server.Query($sql)
+                
+                if (-not $recoverymodel) {
+                    Write-Message -Level Verbose -Message "Server '$instance' does not have any databases in FULL recovery model."
                 }
-                if ($ExcludeDatabase) {
-                    $dblist = $ExcludeDatabase -join "','"
-                    $databasefilter += "AND d.[name] NOT IN ('$dblist')"
-                }
-
-                $sql = "$sqlRecoveryModel $databasefilter"
-
-                Write-Debug $sql
-
-                $recoverymodel = $server.Databases['master'].ExecuteWithResults($sql)
-
-                if ($recoverymodel.Tables[0].Rows.Count -eq 0) {
-                    Write-Output "Server '$servername' does not have any databases in FULL recovery model."
-                }
-                else {
-                    foreach ($recoverymodelrow in $recoverymodel.Tables[0]) {
-                        if (!([bool]$recoverymodelrow.IsReallyInFullRecoveryModel)) {
-                            $notes = "Database is still in SIMPLE recovery model until a full database backup is taken."
-                            $ActualRecoveryModel = "pseudo-SIMPLE"
-                        }
-                        else {
-                            $notes = $null
-                            $ActualRecoveryModel = "FULL"
-                        }
-
-                        $null = $collection.Add([PSCustomObject]@{
-                                Server                  = $recoverymodelrow.Server
-                                Database                = $recoverymodelrow.Database
-                                ConfiguredRecoveryModel = $recoverymodelrow.RecoveryModelDesc
-                                ActualRecoveryModel     = $ActualRecoveryModel
-                                Notes                   = $notes
-                            })
+                
+                foreach ($row in $recoverymodel) {
+                    if (!([bool]$row.IsReallyInFullRecoveryModel)) {
+                        $notes = "Database is still in SIMPLE recovery model until a full database backup is taken."
+                        $ActualRecoveryModel = "pseudo-SIMPLE"
                     }
+                    else {
+                        $notes = $null
+                        $ActualRecoveryModel = "FULL"
+                    }
+                    
+                    [PSCustomObject]@{
+                        ComputerName   = $row.ComputerName
+                        InstanceName   = $row.InstanceName
+                        SqlInstance    = $row.SqlInstance
+                        Database       = $row.Database
+                        ConfiguredRecoveryModel = $row.RecoveryModelDesc
+                        ActualRecoveryModel = $ActualRecoveryModel
+                        Notes          = $notes
+                    } | Select-DefaultView -ExcludeProperty Notes
                 }
             }
             catch {
-                throw $_
+                Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue
             }
         }
     }
-
-    end {
-        if ($Detailed) {
-            return $collection
-        }
-        else {
-            return ($collection | Select-Object * -ExcludeProperty notes)
-        }
-    }
 }
-

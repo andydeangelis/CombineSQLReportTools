@@ -29,7 +29,7 @@ function Get-ServerConfig
 
   # This is the -instance.Name parameter passed from the PS_SQL_DB_Info.ps1 script, hence the 'ValueFromPipeline' definition.
   Param(
-      [parameter(Mandatory=$true,ValueFromPipeline=$True)] $ComputerNames
+      [parameter(Mandatory=$true,ValueFromPipeline=$True)] $ComputerName
    #   [parameter(Mandatory=$true,ValueFromPipeline=$True)] $Path
   )
   
@@ -37,7 +37,7 @@ function Get-ServerConfig
   
   # Let's get some data. For each server in the $ComputerNames array. get target computer system information and add it to the array.
   
-  foreach ($server in $ComputerNames)
+  foreach ($server in $ComputerName)
   {
     # Ping the server to see if it is online.
     if ($server -ne $null)
