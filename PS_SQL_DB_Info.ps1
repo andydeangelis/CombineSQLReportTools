@@ -66,9 +66,23 @@ $Servers = Get-Content "$PSScriptRoot\myservers.txt"
 
 $datetime = get-date -f MM-dd-yyyy_hh.mm.ss
 
- # Use the current path and create a sub-directory of Server/Instance if it does not exist.
+ # Create a dialog box to select the report target path.
+ 
+Add-Type -AssemblyName System.Windows.Forms
+$FolderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+$FolderBrowser.SelectedPath
 
-$targetPath = "$PSScriptRoot\SQLServerInfo\$datetime"
+# If the report path is specified, use that path. Otherwise, use the default path.
+
+if ($FolderBrowser.ShowDialog() -eq "OK")
+{
+    $targetPath = $FolderBrowser.SelectedPath + "\SQLServerInfo\$datetime"
+}
+else
+{
+    $targetPath = "$PSScriptRoot\SQLServerInfo\$datetime"
+}
+
 $failedConnections = "$targetPath\FailedConnections-$datetime.txt"
 $logFile = "$targetPath\DebugLogFile-$datetime.txt"
 
