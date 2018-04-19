@@ -1,3 +1,4 @@
+#ValidationTags#Messaging#
 function Get-DbaAgentJob {
     <#
         .SYNOPSIS
@@ -10,7 +11,7 @@ function Get-DbaAgentJob {
             SQL Server name or SMO object representing the SQL Server to connect to. This can be a collection and receive pipeline input to allow the function to be executed against multiple SQL Server instances.
 
         .PARAMETER SqlCredential
-            SqlCredential object to connect as. If not specified, current Windows login will be used.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Job
             The job(s) to process - this list is auto-populated from the server. If unspecified, all jobs will be processed.
@@ -32,7 +33,7 @@ function Get-DbaAgentJob {
 
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Get-DbaAgentJob
@@ -72,17 +73,18 @@ function Get-DbaAgentJob {
         [parameter(Position = 0, Mandatory = $true, ValueFromPipeline = $True)]
         [Alias("ServerInstance", "SqlServer")]
         [DbaInstanceParameter[]]$SqlInstance,
-        [PSCredential]
-        $SqlCredential,
+        [PSCredential]$SqlCredential,
         [object[]]$Job,
         [object[]]$ExcludeJob,
         [switch]$NoDisabledJobs,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     process {
         foreach ($instance in $SqlInstance) {
-            Write-Verbose "Attempting to connect to $instance"
+            Write-Message -Level Verbose -Message "Attempting to connect to $instance"
+
             try {
                 $server = Connect-SqlInstance -SqlInstance $instance -SqlCredential $SqlCredential
             }

@@ -1,3 +1,4 @@
+#ValidationTags#Messaging,FlowControl,Pipeline,CodeStyle#
 function Get-DbaDatabaseFile {
     <#
     .SYNOPSIS
@@ -18,8 +19,8 @@ function Get-DbaDatabaseFile {
     .PARAMETER ExcludeDatabase
     The database(s) to exclude - this list is auto-populated from the server
 
-    .PARAMETER DatabaseCollection
-    Internal Variable
+    .PARAMETER InputObject
+    A piped collection of database objects
 
     .PARAMETER EnableException
     By default, when something goes wrong we try to catch it, interpret it and give you a friendly warning message.
@@ -31,7 +32,7 @@ function Get-DbaDatabaseFile {
     Tags: Database
     Website: https://dbatools.io
     Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-    License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+    License: MIT https://opensource.org/licenses/MIT
 
     .EXAMPLE
     Get-DbaDatabaseFile -SqlInstance sql2016
@@ -57,9 +58,9 @@ function Get-DbaDatabaseFile {
         [Alias("Databases")]
         [object[]]$Database,
         [object[]]$ExcludeDatabase,
-        [object[]]$DatabaseCollection,
-        [switch][Alias('Silent')]$EnableException
-
+        [object[]]$InputObject,
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     process {
@@ -96,7 +97,7 @@ function Get-DbaDatabaseFile {
             vfs.num_of_reads as NumberOfDiskReads,
             vfs.num_of_bytes_read as BytesReadFromDisk,
             vfs.num_of_bytes_written as BytesWrittenToDisk,
-             fg.data_space_id as FileGroupDataSpaceId,
+            fg.data_space_id as FileGroupDataSpaceId,
             fg.Type as FileGroupType,
             fg.type_desc as FileGroupTypeDescription,
             case fg.is_default When 1 then 'True' when 0 then 'False' end as FileGroupDefault,
@@ -137,20 +138,18 @@ function Get-DbaDatabaseFile {
             from sysfiles df
             left outer join  sysfilegroups fg on df.groupid=fg.groupid"
 
-            Write-Message -Level Verbose -Message "Databases provided"
-
             if ($Database) {
-                $DatabaseCollection = $server.Databases | Where-Object Name -in $database
+                $InputObject = $server.Databases | Where-Object Name -in $database
             }
             else {
-                $DatabaseCollection = $server.Databases
+                $InputObject = $server.Databases
             }
 
             if ($ExcludeDatabase) {
-                $DatabaseCollection = $DatabaseCollection | Where-Object Name -NotIn $ExcludeDatabase
+                $InputObject = $InputObject | Where-Object Name -NotIn $ExcludeDatabase
             }
 
-            foreach ($db in $DatabaseCollection) {
+            foreach ($db in $InputObject) {
                 if (!$db.IsAccessible) {
                     Write-Message -Level Warning -Message "Database $db is not accessible. Skipping"
                     continue
@@ -161,18 +160,18 @@ function Get-DbaDatabaseFile {
                 $version = + ($version.DatabaseCompatibility.ToString().replace("Version", "")) / 10
 
                 if ($version -ge 11) {
-                    $query = ($sql, $sql2008, $sqlfrom, $sql2008from) -join "`n"
+                    $query = ($sql, $sql2008, $sqlfrom, $sql2008from) -Join "`n"
                 }
                 elseif ($version -ge 9) {
-                    $query = ($sql, $sqlfrom) -join "`n"
+                    $query = ($sql, $sqlfrom) -Join "`n"
                 }
                 else {
                     $query = $sql2000
                 }
-                
+
                 Write-Message -Level Debug -Message "SQL Statement: $query"
 
-                $results = $server.Query($query, $db.name)
+                $results = $server.Query($query, $db.Name)
 
                 foreach ($result in $results) {
                     $size = [dbasize]($result.Size * 8192)
@@ -195,9 +194,25 @@ function Get-DbaDatabaseFile {
                         $VolumeFreeSpace = [dbasize]$result.VolumeFreeSpace
                     }
                     else {
-                        $disks = $server.Query("xp_fixeddrives", $db.name)
-                        $free = $disks | Where-Object { $_.drive -eq $result.PhysicalName.Substring(0, 1) } | Select-Object 'MB Free' -ExpandProperty 'MB Free'
-                        $VolumeFreeSpace = [dbasize]($free * 1024 * 1024)
+                        # to get drive free space for each drive that a database has files on
+                        # when database compatibility lower than 110. Lets do this with query2
+                        $query2 = @'
+-- to get drive free space for each drive that a database has files on
+DECLARE @FixedDrives TABLE(Drive CHAR(1), MB_Free BIGINT);
+INSERT @FixedDrives EXEC sys.xp_fixeddrives;
+
+SELECT DISTINCT fd.MB_Free, LEFT(df.physical_name, 1) AS [Drive]
+FROM @FixedDrives AS fd
+INNER JOIN sys.database_files AS df
+ON fd.Drive = LEFT(df.physical_name, 1);
+'@
+                        # if the server has one drive xp_fixeddrives returns one row, but we still need $disks to be an array.
+                        $disks = @($server.Query($query2, $db.Name))
+                        $MbFreeColName = $disks[0].psobject.Properties.Name
+                        # get the free MB value for the drive in question
+                        $free = $disks | Where-Object { $_.drive -eq $result.PhysicalName.Substring(0, 1) } | Select-Object $MbFreeColName
+                        
+                        $VolumeFreeSpace = [dbasize](($free.MB_Free) * 1024 * 1024)
                     }
                     if ($result.GrowthType -eq "Percent") {
                         $nextgrowtheventadd = [dbasize]($result.size * ($result.Growth * 0.01) * 1024)

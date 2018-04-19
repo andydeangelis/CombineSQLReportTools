@@ -4,7 +4,7 @@ function New-DbaDbUser {
             Creates a new user for the specified database.
 
         .DESCRIPTION
-            Created a new user for a specified database with provided specifications.
+            Creates a new user for a specified database with provided specifications.
 
         .PARAMETER SqlInstance
             The target SQL Server instance. Defaults to the default instance on localhost.
@@ -52,7 +52,7 @@ function New-DbaDbUser {
             Author: Frank Henninger (@osiris687)
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/New-DbaDbUser
@@ -60,17 +60,17 @@ function New-DbaDbUser {
         .EXAMPLE
         New-DbaDbUser -SqlInstance sqlserver2014 -Database DB1 -Login user1
 
-        Creates a new sql user with login named user1 in the specified database
+        Creates a new sql user with login named user1 in the specified database.
 
         .EXAMPLE
         New-DbaDbUser -SqlInstance sqlserver2014 -Database DB1 -Username user1
 
-        Creates a new sql user without login named user1 in the specified database
+        Creates a new sql user without login named user1 in the specified database.
 
         .EXAMPLE
         New-DbaDbUser -SqlInstance sqlserver2014 -Database DB1 -Login Login1 -Username user1
 
-        Creates a new sql user named user1 mapped to Login1 in the specified database
+        Creates a new sql user named user1 mapped to Login1 in the specified database.
 
         .EXAMPLE
         Get-DbaDatabaseUser -SqlInstance sqlserver1 -Database DB1 | New-DbaDbUser -SqlInstance sqlserver2 -Database DB1

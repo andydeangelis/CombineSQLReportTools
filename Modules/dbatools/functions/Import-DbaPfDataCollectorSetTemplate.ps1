@@ -87,7 +87,7 @@
         .NOTES
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Import-DbaPfDataCollectorSetTemplate
@@ -95,7 +95,7 @@
         .EXAMPLE
             Import-DbaPfDataCollectorSetTemplate -SqlInstance sql2017 -Template 'Long Running Query'
 
-            Creates a new data collector set named 'Long Running Query' from the dbatools repository on the SQL Server sql2017
+            Creates a new data collector set named 'Long Running Query' from the dbatools repository on the SQL Server sql2017.
 
         .EXAMPLE
             Import-DbaPfDataCollectorSetTemplate -SqlInstance sql2017 -Template 'Long Running Query' -DisplayName 'New Long running query' -Confirm

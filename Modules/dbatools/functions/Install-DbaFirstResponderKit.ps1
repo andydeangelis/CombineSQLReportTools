@@ -15,19 +15,13 @@ function Install-DbaFirstResponderKit {
             SQL Server name or SMO object representing the SQL Server to connect to.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Database
             Specifies the database to instal the First Responder Kit stored procedures into
 
         .PARAMETER Branch
-            Specifies an alternate branch of the First Responder Kit to install.
+            Specifies an alternate branch of the First Responder Kit to install. (master or dev)
 
         .PARAMETER EnableException
             By default, when something goes wrong we try to catch it, interpret it and give you a friendly warning message.
@@ -38,7 +32,7 @@ function Install-DbaFirstResponderKit {
             Author: Tara Kizer, Brent Ozar Unlimited (https://www.brentozar.com/)
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Install-DbaFirstResponderKit
@@ -68,6 +62,11 @@ function Install-DbaFirstResponderKit {
             $servers | Install-DbaFirstResponderKit
 
             Logs into sql2016\standardrtm, sql2016\sqlexpress and sql2014 with Windows authentication and then installs the FRK in the master database.
+
+        .EXAMPLE
+            Install-DbaFirstResponderKit -SqlInstance sql2016 -Branch dev
+
+            Installs the dev branch version of the FRK in the master database on sql2016 instance.
     #>
 
     [CmdletBinding()]
@@ -76,13 +75,15 @@ function Install-DbaFirstResponderKit {
         [Alias("ServerInstance", "SqlServer")]
         [DbaInstanceParameter[]]$SqlInstance,
         [PSCredential]$SqlCredential,
+        [ValidateSet('master', 'dev')]
         [string]$Branch = "master",
         [object]$Database = "master",
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
-        $url = "https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit/archive/$Branch.zip"
+        $url = "https://codeload.github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit/zip/$Branch"
 
         $temp = ([System.IO.Path]::GetTempPath()).TrimEnd("\")
         $zipfile = "$temp\SQL-Server-First-Responder-Kit-$Branch.zip"

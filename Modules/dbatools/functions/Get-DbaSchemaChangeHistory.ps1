@@ -12,7 +12,7 @@ function Get-DbaSchemaChangeHistory {
     to be executed against multiple SQL Server instances.
 
     .PARAMETER SqlCredential
-    SqlCredential object to connect as. If not specified, current Windows login will be used.
+    Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
     .PARAMETER Database
     The database(s) to process - this list is auto-populated from the server. If unspecified, all databases will be processed.
@@ -37,7 +37,7 @@ function Get-DbaSchemaChangeHistory {
 
     Website: https://dbatools.io
     Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-    License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+    License: MIT https://opensource.org/licenses/MIT
 
     .LINK
     https://dbatools.io/Get-DbaSchemaChangeHistory
@@ -77,7 +77,8 @@ function Get-DbaSchemaChangeHistory {
         [object[]]$ExcludeDatabase,
         [DbaDateTime]$Since,
         [string[]]$Object,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     process {

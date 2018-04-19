@@ -23,13 +23,7 @@ function Invoke-DbaBalanceDataFiles {
             The target SQL Server instance or instances.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
     .PARAMETER Database
         The database(s) to process.
@@ -66,7 +60,7 @@ function Invoke-DbaBalanceDataFiles {
 
         Website: https://dbatools.io
         Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-        License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+        License: MIT https://opensource.org/licenses/MIT
 
     .EXAMPLE
     Invoke-DbaBalanceDataFiles -SqlInstance sql1 -Database db1
@@ -182,7 +176,9 @@ function Invoke-DbaBalanceDataFiles {
                     $dbDiskUsage = $Server.Query($query)
 
                     # Get the free space for each drive
-                    $diskFreeSpace = $Server.Query("xp_fixeddrives") | Select-Object Drive, @{ Name = 'FreeMB'; Expression = { $_.'MB free' } }
+                    $result = $Server.Query("xp_fixeddrives")
+                    $MbFreeColName = $result[0].psobject.Properties.Name[1]
+                    $diskFreeSpace = $result | Select-Object Drive, @{ Name = 'FreeMB'; Expression = { $_.$MbFreeColName } }
 
                     # Loop through each of the drives to see if the size of files on that
                     # particular disk do not exceed the free space of that disk

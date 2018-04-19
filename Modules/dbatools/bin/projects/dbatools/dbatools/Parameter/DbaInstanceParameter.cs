@@ -453,6 +453,7 @@ namespace Sqlcollaborative.Dbatools.Parameter
         public DbaInstanceParameter(IPAddress Address)
         {
             _ComputerName = Address.ToString();
+            InputObject = Address;
         }
 
         /// <summary>
@@ -462,6 +463,7 @@ namespace Sqlcollaborative.Dbatools.Parameter
         public DbaInstanceParameter(PingReply Ping)
         {
             _ComputerName = Ping.Address.ToString();
+            InputObject = Ping;
         }
 
         /// <summary>
@@ -471,6 +473,7 @@ namespace Sqlcollaborative.Dbatools.Parameter
         public DbaInstanceParameter(IPHostEntry Entry)
         {
             _ComputerName = Entry.HostName;
+            InputObject = Entry;
         }
 
         /// <summary>
@@ -492,6 +495,16 @@ namespace Sqlcollaborative.Dbatools.Parameter
                 _Port = tempParam.Port;
             }
             _NetworkProtocol = tempParam.NetworkProtocol;
+        }
+
+        /// <summary>
+        /// Accept and understand discovery reports.
+        /// </summary>
+        /// <param name="Report">The report to interpret</param>
+        public DbaInstanceParameter(Discovery.DbaInstanceReport Report)
+            : this(Report.SqlInstance)
+        {
+            InputObject = Report;
         }
 
         /// <summary>

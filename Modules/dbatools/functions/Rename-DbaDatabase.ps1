@@ -116,8 +116,8 @@ function Rename-DbaDatabase {
     .PARAMETER Confirm
         If this switch is enabled, you will be prompted for confirmation before executing any operations that change state.
 
-    .PARAMETER DatabaseCollection
-        Internal parameter to be able to accept piped data
+    .PARAMETER InputObject
+        Accepts piped database objects
 
     .PARAMETER EnableException
         By default, when something goes wrong we try to catch it, interpret it and give you a friendly warning message.
@@ -129,7 +129,7 @@ function Rename-DbaDatabase {
 
         Website: https://dbatools.io
         Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-        License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+        License: MIT https://opensource.org/licenses/MIT
 
     .LINK
         https://dbatools.io/Rename-DbaDatabase
@@ -215,8 +215,9 @@ function Rename-DbaDatabase {
         [switch]$SetOffline,
         [switch]$Preview,
         [parameter(Mandatory, ValueFromPipeline, ParameterSetName = "Pipe")]
-        [Microsoft.SqlServer.Management.Smo.Database[]]$DatabaseCollection,
-        [switch][Alias('Silent')]$EnableException
+        [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject,
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
@@ -245,7 +246,7 @@ function Rename-DbaDatabase {
     }
     process {
         if (Test-FunctionInterrupt) { return }
-        if (!$Database -and !$AllDatabases -and !$DatabaseCollection -and !$ExcludeDatabase) {
+        if (!$Database -and !$AllDatabases -and !$InputObject -and !$ExcludeDatabase) {
             Stop-Function -Message "You must specify a -AllDatabases or -Database/ExcludeDatabase to continue"
             return
         }
@@ -254,10 +255,10 @@ function Rename-DbaDatabase {
             return
         }
         $dbs = @()
-        if ($DatabaseCollection) {
-            if ($DatabaseCollection.Name) {
+        if ($InputObject) {
+            if ($InputObject.Name) {
                 # comes from Get-DbaDatabase
-                $dbs += $DatabaseCollection
+                $dbs += $InputObject
             }
         }
         else {

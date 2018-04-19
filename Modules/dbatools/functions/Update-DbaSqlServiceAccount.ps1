@@ -12,7 +12,7 @@ function Update-DbaSqlServiceAccount {
     .PARAMETER Credential
     Windows Credential with permission to log on to the server running the SQL instance
 
-    .PARAMETER ServiceCollection
+    .PARAMETER InputObject
     A collection of services. Basically, any object that has ComputerName and ServiceName properties. Can be piped from Get-DbaSqlService.
 
     .PARAMETER ServiceName
@@ -52,7 +52,7 @@ function Update-DbaSqlServiceAccount {
     Tags:
     dbatools PowerShell module (https://dbatools.io, clemaire@gmail.com)
     Copyright (C) 2017 Chrissy LeMaire
-    License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+    License: MIT https://opensource.org/licenses/MIT
 
     .EXAMPLE
     $NewPassword = ConvertTo-SecureString 'Qwerty1234' -AsPlainText -Force
@@ -83,8 +83,9 @@ function Update-DbaSqlServiceAccount {
         [Alias("cn", "host", "Server")]
         [DbaInstanceParameter[]]$ComputerName = $env:COMPUTERNAME,
         [PSCredential]$Credential,
-        [parameter(ValueFromPipeline = $true, Mandatory = $true, ParameterSetName = "ServiceCollection")]
-        [object[]]$ServiceCollection,
+        [parameter(ValueFromPipeline = $true, Mandatory = $true, ParameterSetName = "InputObject")]
+        [Alias("ServiceCollection")]
+        [object[]]$InputObject,
         [parameter(ParameterSetName = "ServiceName", Position = 1, Mandatory = $true)]
         [Alias("Name", "Service")]
         [string[]]$ServiceName,
@@ -94,7 +95,8 @@ function Update-DbaSqlServiceAccount {
         [securestring]$OldPassword = (New-Object System.Security.SecureString),
         [Alias("Password")]
         [securestring]$NewPassword = (New-Object System.Security.SecureString),
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
     begin {
         $svcCollection = @()
@@ -162,8 +164,8 @@ function Update-DbaSqlServiceAccount {
                 }
             }
         }
-        elseif ($PsCmdlet.ParameterSetName -match 'ServiceCollection') {
-            foreach ($service in $ServiceCollection) {
+        elseif ($PsCmdlet.ParameterSetName -match 'InputObject') {
+            foreach ($service in $InputObject) {
                 $Server = Resolve-DbaNetworkName -ComputerName $service.ComputerName -Credential $credential
                 if ($Server.ComputerName) {
                     $svcCollection += [psobject]@{

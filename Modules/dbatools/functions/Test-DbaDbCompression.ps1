@@ -32,7 +32,7 @@ function Test-DbaDbCompression {
         SQL Server name or SMO object representing the SQL Server to connect to. This can be a collection and receive pipeline input to allow the function to be executed against multiple SQL Server instances.
 
     .PARAMETER SqlCredential
-        SqlCredential object to connect as. If not specified, current Windows login will be used.
+        Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
     .PARAMETER Database
         The database(s) to process - this list is autopopulated from the server. If unspecified, all databases will be processed.
@@ -50,7 +50,7 @@ function Test-DbaDbCompression {
         Tags: Compression, Table, Database
         Website: https://dbatools.io
         Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-        License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+        License: MIT https://opensource.org/licenses/MIT
 
     .LINK
         https://dbatools.io/Test-DbaCompression
@@ -63,7 +63,7 @@ function Test-DbaDbCompression {
     .EXAMPLE
         Test-DbaCompression -SqlInstance ServerA -Database DBName | Out-GridView
         Returns results of all potential compression options for a single database
-        with the recommendation of either Page or Row into and nicely formated GridView
+        with the recommendation of either Page or Row into and nicely formatted GridView
 
     .EXAMPLE
         Test-DbaCompression -SqlInstance ServerA
@@ -83,7 +83,7 @@ function Test-DbaDbCompression {
         }
 
         This produces a full analysis of all your servers listed and is pushed to a csv for you to
-        analyize.
+        analyze.
 #>
     [CmdletBinding(DefaultParameterSetName = "Default")]
     param (
@@ -93,7 +93,8 @@ function Test-DbaDbCompression {
         [PSCredential]$SqlCredential,
         [object[]]$Database,
         [object[]]$ExcludeDatabase,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {

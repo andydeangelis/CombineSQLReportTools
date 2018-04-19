@@ -10,7 +10,7 @@ function Stop-DbaAgentJob {
             SQL Server name or SMO object representing the SQL Server to connect to.
 
         .PARAMETER SqlCredential
-            SqlCredential object to connect as. If not specified, current Windows login will be used.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Job
             The job(s) to process - this list is auto-populated from the server. If unspecified, all jobs will be processed.
@@ -21,7 +21,7 @@ function Stop-DbaAgentJob {
         .PARAMETER Wait
             Wait for output until the job has completely stopped
 
-        .PARAMETER JobCollection
+        .PARAMETER InputObject
             Internal parameter that enables piping
 
         .PARAMETER WhatIf
@@ -39,7 +39,7 @@ function Stop-DbaAgentJob {
             Tags: Job, Agent
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Stop-DbaAgentJob
@@ -69,9 +69,10 @@ function Stop-DbaAgentJob {
         [string[]]$Job,
         [string[]]$ExcludeJob,
         [parameter(Mandatory, ValueFromPipeline, ParameterSetName = "Object")]
-        [Microsoft.SqlServer.Management.Smo.Agent.Job[]]$JobCollection,
+        [Microsoft.SqlServer.Management.Smo.Agent.Job[]]$InputObject,
         [switch]$Wait,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     process {
@@ -84,17 +85,17 @@ function Stop-DbaAgentJob {
                 Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue
             }
 
-            $jobcollection += $server.JobServer.Jobs
+            $InputObject += $server.JobServer.Jobs
 
             if ($Job) {
-                $jobcollection = $jobcollection | Where-Object Name -In $Job
+                $InputObject = $InputObject | Where-Object Name -In $Job
             }
             if ($ExcludeJob) {
-                $jobcollection = $jobcollection | Where-Object Name -NotIn $ExcludeJob
+                $InputObject = $InputObject | Where-Object Name -NotIn $ExcludeJob
             }
         }
 
-        foreach ($currentjob in $JobCollection) {
+        foreach ($currentjob in $InputObject) {
 
             $server = $currentjob.Parent.Parent
             $status = $currentjob.CurrentRunStatus

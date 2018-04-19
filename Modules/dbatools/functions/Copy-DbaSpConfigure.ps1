@@ -10,25 +10,13 @@ function Copy-DbaSpConfigure {
             Source SQL Server. You must have sysadmin access and server version must be SQL Server version 2000 or higher.
 
         .PARAMETER SourceSqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SourceSqlCredential parameter.
-
-            Windows Authentication will be used if SourceSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Destination
             Destination SQL Server. You must have sysadmin access and the server must be SQL Server 2000 or higher.
 
         .PARAMETER DestinationSqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $dcred = Get-Credential, then pass this $dcred to the -DestinationSqlCredential parameter.
-
-            Windows Authentication will be used if DestinationSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER ConfigName
             Specifies the configuration setting to process. Options for this list are auto-populated from the server. If unspecified, all ConfigNames will be processed.
@@ -54,7 +42,7 @@ function Copy-DbaSpConfigure {
 
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Copy-DbaSpConfigure
@@ -91,7 +79,8 @@ function Copy-DbaSpConfigure {
         $DestinationSqlCredential,
         [object[]]$ConfigName,
         [object[]]$ExcludeConfigName,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
@@ -141,12 +130,13 @@ function Copy-DbaSpConfigure {
             if ($Pscmdlet.ShouldProcess($destination, "Updating $sConfigName [$displayName]")) {
                 try {
                     $destOldConfigValue = $destProp.ConfiguredValue
-
-                    $result = Set-DbaSpConfigure -SqlInstance $destServer -ConfigName $sConfigName -Value $sConfiguredValue -EnableException -Mode 'Lazy'
-                    if ($result) {
-                        Write-Message -Level Verbose -Message "Updated $($destProp.ConfigName) ($($destProp.DisplayName)) from $destOldConfigValue to $sConfiguredValue."
+                    
+                    if ($sConfiguredValue -ne $destOldConfigValue) {
+                        $result = Set-DbaSpConfigure -SqlInstance $destServer -Name $sConfigName -Value $sConfiguredValue -EnableException -WarningAction SilentlyContinue
+                        if ($result) {
+                            Write-Message -Level Verbose -Message "Updated $($destProp.ConfigName) ($($destProp.DisplayName)) from $destOldConfigValue to $sConfiguredValue."
+                        }
                     }
-
                     if ($requiresRestart -eq $false) {
                         Write-Message -Level Verbose -Message "Configuration option $sConfigName ($displayName) requires restart."
                         $copySpConfigStatus.Notes = "Requires restart"
@@ -155,8 +145,13 @@ function Copy-DbaSpConfigure {
                     $copySpConfigStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
                 }
                 catch {
-                    $copySpConfigStatus.Status = "Failed"
-                    $copySpConfigStatus.Notes = $_.Exception
+                    if ($_.Exception -match 'the same as the') {
+                        $copySpConfigStatus.Status = "Successful"
+                    }
+                    else {
+                        $copySpConfigStatus.Status = "Failed"
+                        $copySpConfigStatus.Notes = $_.Exception
+                    }
                     $copySpConfigStatus | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
 
                     Stop-Function -Message "Could not set $($destProp.ConfigName) to $sConfiguredValue." -Target $sConfigName -ErrorRecord $_

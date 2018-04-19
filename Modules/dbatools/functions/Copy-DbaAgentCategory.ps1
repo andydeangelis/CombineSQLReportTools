@@ -1,3 +1,4 @@
+#ValidationTags#Messaging#
 function Copy-DbaAgentCategory {
     <#
         .SYNOPSIS
@@ -18,25 +19,13 @@ function Copy-DbaAgentCategory {
             Source SQL Server. You must have sysadmin access and server version must be SQL Server version 2000 or higher.
 
         .PARAMETER SourceSqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SourceSqlCredential parameter.
-
-            Windows Authentication will be used if SourceSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Destination
             Destination SQL Server. You must have sysadmin access and the server must be SQL Server 2000 or higher.
 
         .PARAMETER DestinationSqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $dcred = Get-Credential, then pass this $dcred to the -DestinationSqlCredential parameter.
-
-            Windows Authentication will be used if DestinationSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER CategoryType
             Specifies the Category Type to migrate. Valid options are "Job", "Alert" and "Operator". When CategoryType is specified, all categories from the selected type will be migrated. For granular migrations, use the three parameters below.
@@ -71,7 +60,7 @@ function Copy-DbaAgentCategory {
 
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Copy-DbaAgentCategory
@@ -104,13 +93,16 @@ function Copy-DbaAgentCategory {
         [Parameter(ParameterSetName = 'SpecificAlerts')]
         [ValidateSet('Job', 'Alert', 'Operator')]
         [string[]]$CategoryType,
+        [string[]]$JobCategory,
+        [string[]]$AgentCategory,
+        [string[]]$OperatorCategory,
         [switch]$Force,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
-
-        Function Copy-JobCategory {
+        function Copy-JobCategory {
             <#
                 .SYNOPSIS
                     Copy-JobCategory migrates job categories from one SQL Server to another.
@@ -121,7 +113,7 @@ function Copy-DbaAgentCategory {
                     If the associated credential for the category does not exist on the destination, it will be skipped. If the job category already exists on the destination, it will be skipped unless -Force is used.
             #>
             param (
-                [string[]]$JobCategories
+                [string[]]$jobCategories
             )
 
             process {
@@ -142,7 +134,7 @@ function Copy-DbaAgentCategory {
                         DateTime          = [Sqlcollaborative.Dbatools.Utility.DbaDateTime](Get-Date)
                     }
 
-                    if ($JobCategories.Count -gt 0 -and $JobCategories -notcontains $categoryName) {
+                    if ($jobCategories.Count -gt 0 -and $jobCategories -notcontains $categoryName) {
                         continue
                     }
 
@@ -155,7 +147,7 @@ function Copy-DbaAgentCategory {
                             continue
                         }
                         else {
-                            if ($Pscmdlet.ShouldProcess($destination, "Dropping job category $categoryName and recreating")) {
+                            if ($Pscmdlet.ShouldProcess($destination, "Dropping job category $categoryName")) {
                                 try {
                                     Write-Message -Level Verbose -Message "Dropping Job category $categoryName"
                                     $destServer.JobServer.JobCategories[$categoryName].Drop()
@@ -173,7 +165,7 @@ function Copy-DbaAgentCategory {
                         try {
                             Write-Message -Level Verbose -Message "Copying Job category $categoryName"
                             $sql = $jobCategory.Script() | Out-String
-                            Write-Message -Level Debug -Message $sql
+                            Write-Message -Level Debug -Message "SQL Statement: $sql"
                             $destServer.Query($sql)
 
                             $copyJobCategoryStatus.Status = "Successful"
@@ -201,7 +193,7 @@ function Copy-DbaAgentCategory {
             #>
             [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldprocess = $true)]
             param (
-                [string[]]$OperatorCategories
+                [string[]]$operatorCategories
             )
             process {
                 $serverOperatorCategories = $sourceServer.JobServer.OperatorCategories | Where-Object ID -ge 100
@@ -327,7 +319,7 @@ function Copy-DbaAgentCategory {
                                     $destServer.JobServer.AlertCategories[$categoryName].Drop()
                                     Write-Message -Level Verbose -Message "Copying Alert category $categoryName"
                                     $sql = $alertcategory.Script() | Out-String
-                                    Write-Verbose $sql
+                                    Write-Message -Level Debug -Message "SQL Statement: $sql"
                                     $destServer.Query($sql)
                                 }
                                 catch {

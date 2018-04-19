@@ -1,10 +1,10 @@
 function Export-DbaXECsv {
     <#
         .SYNOPSIS
-            Exports Extended Events to a CSV file
+            Exports Extended Events to a CSV file.
 
         .DESCRIPTION
-            Exports Extended Events to a CSV file
+            Exports Extended Events to a CSV file.
 
         .PARAMETER Path
             Specifies the InputObject to the output CSV file
@@ -22,7 +22,7 @@ function Export-DbaXECsv {
             Tags: ExtendedEvent, XE, Xevent
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
             SmartTarget: by Gianluca Sartori (@spaghettidba)
 
         .LINK
@@ -31,12 +31,12 @@ function Export-DbaXECsv {
         .EXAMPLE
             Get-ChildItem -Path C:\temp\sample.xel | Export-DbaXECsv -Path c:\temp\sample.csv
 
-            Writes Extended Events data to the file "C:\temp\events.csv"
+            Writes Extended Events data to the file "C:\temp\events.csv".
 
          .EXAMPLE
             Get-DbaXESession -SqlInstance sql2014 -Session deadlocks | Export-DbaXECsv -Path c:\temp\events.csv
 
-            Writes Extended Events data to the file "C:\temp\events.csv"
+            Writes Extended Events data to the file "C:\temp\events.csv".
     #>
     [CmdletBinding()]
     param (
@@ -146,6 +146,14 @@ function Export-DbaXECsv {
 
             try {
                 $adapter.Convert()
+                $file = Get-ChildItem -Path $adapter.OutputFile
+
+                if ($file.Length -eq 0) {
+                    Remove-Item -Path $adapter.OutputFile
+                }
+                else {
+                    $file
+                }
             }
             catch {
                 Stop-Function -Message "Failure" -ErrorRecord $_ -Target "XESmartTarget" -Continue

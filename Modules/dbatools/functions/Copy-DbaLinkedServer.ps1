@@ -13,23 +13,13 @@ function Copy-DbaLinkedServer {
             Source SQL Server (2005 and above). You must have sysadmin access to both SQL Server and Windows.
 
         .PARAMETER SourceSqlCredential
-            Allows you to login to servers using SQL Logins as opposed to Windows Auth/Integrated/Trusted. To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SourceSqlCredential parameter.
-
-            Windows Authentication will be used if DestinationSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Destination
             Destination SQL Server (2005 and above). You must have sysadmin access to both SQL Server and Windows.
 
         .PARAMETER DestinationSqlCredential
-            Allows you to login to servers using SQL Logins as opposed to Windows Auth/Integrated/Trusted. To use:
-
-            $dcred = Get-Credential, then pass this $dcred to the -DestinationSqlCredential parameter.
-
-            Windows Authentication will be used if DestinationSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER LinkedServer
             The linked server(s) to process - this list is auto-populated from the server. If unspecified, all linked servers will be processed.
@@ -89,7 +79,8 @@ function Copy-DbaLinkedServer {
         [object[]]$ExcludeLinkedServer,
         [switch]$UpgradeSqlClient,
         [switch]$Force,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
     begin {
         $null = Test-ElevationRequirement -ComputerName $Source.ComputerName
@@ -305,7 +296,7 @@ function Copy-DbaLinkedServer {
                 if ($destServer.Settings.OleDbProviderSettings.Name.Length -ne 0) {
                     if (!$destServer.Settings.OleDbProviderSettings.Name -contains $provider -and !$provider.StartsWith("SQLN")) {
                         $copyLinkedServer.Status = "Skipped"
-                        $copyLinkedServer.Notes = "Already exists"
+                        $copyLinkedServer.Notes = "Missing provider"
                         $copyLinkedServer | Select-DefaultView -Property DateTime, SourceServer, DestinationServer, Name, Type, Status, Notes -TypeName MigrationObject
 
                         Write-Message -Level Verbose -Message "$($destServer.Name) does not support the $provider provider. Skipping $linkedServerName."
@@ -341,9 +332,11 @@ function Copy-DbaLinkedServer {
                         Write-Message -Level Debug -Message $sql
 
                         if ($UpgradeSqlClient -and $sql -match "sqlncli") {
-                            $newstring = "sqlncli$($destServer.VersionMajor)"
-                            Write-Message -Level Verbose -Message "Changing sqlncli to $newstring"
-                            $sql = $sql -replace ("sqlncli[0-9]+", $newstring)
+                            $destProviders = $destServer.Settings.OleDbProviderSettings | Where-Object { $_.Name -like 'SQLNCLI*' }
+                            $newProvider = $destProviders | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty Name
+
+                            Write-Message -Level Verbose -Message "Changing sqlncli to $newProvider"
+                            $sql = $sql -replace ("sqlncli[0-9]+", $newProvider)
                         }
 
                         $destServer.Query($sql)

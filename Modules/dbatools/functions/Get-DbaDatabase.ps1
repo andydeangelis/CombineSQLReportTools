@@ -1,3 +1,4 @@
+#ValidationTags#CodeStyle,Messaging,FlowControl,Pipeline#
 function Get-DbaDatabase {
     <#
         .SYNOPSIS
@@ -11,13 +12,7 @@ function Get-DbaDatabase {
             The SQL Server instance to connect to.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Database
             Specifies one or more database(s) to process. If unspecified, all databases will be processed.
@@ -65,6 +60,9 @@ function Get-DbaDatabase {
         .PARAMETER IncludeLastUsed
             If this switch is enabled, the last used read & write times for each database will be returned. This data is retrieved from sys.dm_db_index_usage_stats which is reset when SQL Server is restarted.
 
+        .PARAMETER OnlyAccessible
+           If this switch is enabled, only accessible databases are returned (huge speedup in SMO enumeration)
+
         .PARAMETER WhatIf
             If this switch is enabled, no actions are performed but informational messages will be displayed that explain what would happen if the command were to run.
 
@@ -84,7 +82,7 @@ function Get-DbaDatabase {
 
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Get-DbaDatabase
@@ -170,8 +168,10 @@ function Get-DbaDatabase {
         [datetime]$NoFullBackupSince,
         [switch]$NoLogBackup,
         [datetime]$NoLogBackupSince,
-        [switch][Alias('Silent')]$EnableException,
-        [switch]$IncludeLastUsed
+        [Alias('Silent')]
+        [switch]$EnableException,
+        [switch]$IncludeLastUsed,
+        [switch]$OnlyAccessible
     )
 
     begin {
@@ -246,27 +246,47 @@ function Get-DbaDatabase {
                 $DBType = @($false, $true)
             }
 
+            $AccessibleFilter = switch ($OnlyAccessible) {
+                $true { @($true) }
+                default { @($true, $false) }
+            }
+
             $Readonly = switch ($Access) {
-                'Readonly' { @($true) } 'ReadWrite' { @($false) }
+                'Readonly' { @($true) }
+                'ReadWrite' { @($false) }
                 default { @($true, $false) }
             }
             $Encrypt = switch (Test-Bound $Encrypted) {
                 $true { @($true) }
                 default { @($true, $false, $null) }
             }
+            function Invoke-QueryRawDatabases {
+                $server.Query("SELECT *, SUSER_NAME(owner_sid) AS [Owner] FROM sys.databases")
+            }
+            $backed_info = Invoke-QueryRawDatabases
+            $backed_info = $backed_info | Where-Object {
+                ($_.name -in $Database -or !$Database) -and
+                ($_.name -notin $ExcludeDatabase -or !$ExcludeDatabase) -and
+                ($_.Owner -in $Owner -or !$Owner) -and
+                ($_.state -ne 6 -or !$OnlyAccessible)
+            }
 
-            $inputobject = $server.Databases |
+            $inputObject = @()
+            foreach($dt in $backed_info) {
+                $inputObject += $server.Databases[$dt.name]
+            }
+            $inputobject = $inputObject |
                 Where-Object {
                 ($_.Name -in $Database -or !$Database) -and
                 ($_.Name -notin $ExcludeDatabase -or !$ExcludeDatabase) -and
                 ($_.Owner -in $Owner -or !$Owner) -and
                 $_.ReadOnly -in $Readonly -and
+                $_.IsAccessible -in $AccessibleFilter -and
                 $_.IsSystemObject -in $DBType -and
                 ((Compare-Object @($_.Status.tostring().split(',').trim()) $Status -ExcludeDifferent -IncludeEqual).inputobject.count -ge 1 -or !$status) -and
                 $_.RecoveryModel -in $RecoveryModel -and
                 $_.EncryptionEnabled -in $Encrypt
             }
-
             if ($NoFullBackup -or $NoFullBackupSince) {
                 $dabs = (Get-DbaBackupHistory -SqlInstance $server -LastFull )
                 if ($null -ne $NoFullBackupSince) {
@@ -323,7 +343,7 @@ function Get-DbaDatabase {
                     Add-Member -Force -InputObject $db -MemberType NoteProperty -Name LastRead -value $lastusedinfo.last_read
                     Add-Member -Force -InputObject $db -MemberType NoteProperty -Name LastWrite -value $lastusedinfo.last_write
                     Select-DefaultView -InputObject $db -Property $defaults
-                    try { $server.Databases.Refresh() } catch {}
+                    #try { $server.Databases.Refresh() } catch {}
                 }
             }
             catch {

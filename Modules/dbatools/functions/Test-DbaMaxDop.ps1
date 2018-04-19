@@ -21,13 +21,7 @@ function Test-DbaMaxDop {
             The SQL Server instance(s) to connect to.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Detailed
             Output all properties, will be deprecated in 1.0.0 release.
@@ -44,7 +38,7 @@ function Test-DbaMaxDop {
 
             dbatools PowerShell module (https://dbatools.io, clemaire@gmail.com)
             Copyright (C) 2016 Chrissy LeMaire
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Test-DbaMaxDop
@@ -57,12 +51,12 @@ function Test-DbaMaxDop {
         .EXAMPLE
             Test-DbaMaxDop -SqlInstance sql2014 | Select-Object *
 
-            Shows Max DOP setting for server sql2014 with the recommended value. As the -Detailed switch was used will also show the 'NUMANodes' and 'NumberOfCores' of each instance
+            Shows Max DOP setting for server sql2014 with the recommended value. Piping the output to Select-Object * will also show the 'NUMANodes' and 'NumberOfCores' of each instance
 
         .EXAMPLE
             Test-DbaMaxDop -SqlInstance sqlserver2016 | Select-Object *
 
-            Get Max DOP setting for servers sql2016 with the recommended value. As the -Detailed switch was used will also show the 'NUMANodes' and 'NumberOfCores' of each instance. Because it is an 2016 instance will be shown 'InstanceVersion', 'Database' and 'DatabaseMaxDop' columns.
+            Get Max DOP setting for servers sql2016 with the recommended value. Piping the output to Select-Object * will also show the 'NUMANodes' and 'NumberOfCores' of each instance. Because it is an 2016 instance will be shown 'InstanceVersion', 'Database' and 'DatabaseMaxDop' columns.
     #>
     [CmdletBinding()]
     [OutputType([System.Collections.ArrayList])]
@@ -71,8 +65,9 @@ function Test-DbaMaxDop {
         [Alias("ServerInstance", "SqlServer", "SqlServers")]
         [DbaInstance[]]$SqlInstance,
         [PSCredential]$SqlCredential,
-        [Switch]$Detailed,
-        [switch][Alias('Silent')]$EnableException
+        [switch]$Detailed,
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
@@ -83,7 +78,6 @@ function Test-DbaMaxDop {
         $notesDopZero = "This is the default setting. Consider using the recommended value instead."
         $notesDopOne = "Some applications like SharePoint, Dynamics NAV, SAP, BizTalk has the need to use MAXDOP = 1. Please confirm that your instance is not supporting one of these applications prior to changing the MaxDop."
         $notesAsRecommended = "Configuration is as recommended."
-        $collection = @()
     }
 
     process {
@@ -167,7 +161,6 @@ function Test-DbaMaxDop {
                 }
             }
 
-            #$collection +=
             [pscustomobject]@{
                 ComputerName          = $server.NetName
                 InstanceName          = $server.ServiceName
@@ -198,7 +191,6 @@ function Test-DbaMaxDop {
 
                     $dbmaxdop = $database.MaxDop
 
-                    #$collection +=
                     [pscustomobject]@{
                         ComputerName          = $server.NetName
                         InstanceName          = $server.ServiceName

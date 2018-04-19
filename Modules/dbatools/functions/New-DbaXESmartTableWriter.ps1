@@ -14,13 +14,7 @@
             Target SQL Server. You must have sysadmin access and server version must be SQL Server version 2008 or higher.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Database
             Specifies the name of the database that contains the target table.
@@ -36,14 +30,14 @@
         .PARAMETER UploadIntervalSeconds
             Specifies the number of seconds XESmartTarget will keep the events in memory before dumping them to the target table. The default is 10 seconds.
 
-        .PARAMETER OutputColumns
+        .PARAMETER OutputColumn
             Specifies the list of columns to output from the events. XESmartTarget will capture in memory and write to the target table only the columns (fields or targets) that are present in this list.
 
             Fields and actions are matched in a case-sensitive manner.
 
             Expression columns are supported. Specify a column with ColumnName AS Expression to add an expression column (Example: Total AS Reads + Writes)
 
-        .PARAMETER Events
+        .PARAMETER Event
             Specifies a list of events to be processed (with others being ignored. By default, all events are processed.
 
         .PARAMETER Filter
@@ -60,7 +54,7 @@
             Tags: ExtendedEvent, XE, Xevent
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
             SmartTarget: by Gianluca Sartori (@spaghettidba)
 
         .LINK
@@ -69,9 +63,9 @@
 
         .EXAMPLE
             $columns = "cpu_time", "duration", "physical_reads", "logical_reads", "writes", "row_count", "batch_text"
-            $response = New-DbaXESmartTableWriter -SqlInstance sql2017 -Database dbadb -Table deadlocktracker -OutputColumns $columns -Filter "duration > 10000"
+            $response = New-DbaXESmartTableWriter -SqlInstance sql2017 -Database dbadb -Table deadlocktracker -OutputColumn $columns -Filter "duration > 10000"
             Start-DbaXESmartTarget -SqlInstance sql2017 -Session deadlock_tracker -Responder $response
-            
+
             Writes Extended Events to the deadlocktracker table in dbadb on sql2017.
     #>
     [CmdletBinding()]
@@ -86,8 +80,8 @@
         [string]$Table,
         [switch]$AutoCreateTargetTable,
         [int]$UploadIntervalSeconds = 10,
-        [string[]]$Events,
-        [string[]]$OutputColumns,
+        [string[]]$Event,
+        [string[]]$OutputColumn,
         [string]$Filter,
         [switch]$EnableException
     )
@@ -119,9 +113,15 @@
                 $writer.TableName = $Table
                 $writer.AutoCreateTargetTable = $AutoCreateTargetTable
                 $writer.UploadIntervalSeconds = $UploadIntervalSeconds
-                $writer.Events = $Events
-                $writer.OutputColumns = $OutputColumns
-                $writer.Filter = $Filter
+                if (Test-Bound -ParameterName "Event") {
+                    $writer.Events = $Event
+                }
+                if (Test-Bound -ParameterName "OutputColumn") {
+                    $writer.OutputColumns = $OutputColumn
+                }
+                if (Test-Bound -ParameterName "Filter") {
+                    $writer.Filter = $Filter
+                }
                 $writer
             }
             catch {

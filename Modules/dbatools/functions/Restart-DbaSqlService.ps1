@@ -24,7 +24,7 @@ function Restart-DbaSqlService {
     .PARAMETER Timeout
     How long to wait for the start/stop request completion before moving on. Specify 0 to wait indefinitely.
 
-    .PARAMETER ServiceCollection
+    .PARAMETER InputObject
     A collection of services from Get-DbaSqlService
 
     .PARAMETER EnableException
@@ -46,7 +46,7 @@ function Restart-DbaSqlService {
 
     dbatools PowerShell module (https://dbatools.io)
     Copyright (C) 2017 Chrissy LeMaire
-    License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+    License: MIT https://opensource.org/licenses/MIT
 
     .LINK
     https://dbatools.io/Restart-DbaSqlService
@@ -86,11 +86,13 @@ function Restart-DbaSqlService {
         [ValidateSet("Agent", "Browser", "Engine", "FullText", "SSAS", "SSIS", "SSRS")]
         [string[]]$Type,
         [parameter(ValueFromPipeline = $true, Mandatory = $true, ParameterSetName = "Service")]
-        [object[]]$ServiceCollection,
+        [Alias("ServiceCollection")]
+        [object[]]$InputObject,
         [int]$Timeout = 30,
         [PSCredential]$Credential,
         [switch]$Force,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
     begin {
         $processArray = @()
@@ -100,12 +102,12 @@ function Restart-DbaSqlService {
             if ($Type) { $serviceParams.Type = $Type }
             if ($Credential) { $serviceParams.Credential = $Credential }
             if ($EnableException) { $serviceParams.Silent = $EnableException }
-            $serviceCollection = Get-DbaSqlService @serviceParams
+            $InputObject = Get-DbaSqlService @serviceParams
         }
     }
     process {
         #Get all the objects from the pipeline before proceeding
-        $processArray += $serviceCollection
+        $processArray += $InputObject
     }
     end {
         $processArray = [array]($processArray | Where-Object { (!$InstanceName -or $_.InstanceName -in $InstanceName) -and (!$Type -or $_.ServiceType -in $Type) })
@@ -124,13 +126,13 @@ function Restart-DbaSqlService {
             }
         }
         if ($processArray) {
-            $services = Update-ServiceStatus -ServiceCollection $processArray -Action 'stop' -Timeout $Timeout -EnableException $EnableException
+            $services = Update-ServiceStatus -InputObject $processArray -Action 'stop' -Timeout $Timeout -EnableException $EnableException
             foreach ($service in ($services | Where-Object { $_.Status -eq 'Failed'})) {
                 $service
             }
             $services = $services | Where-Object { $_.Status -eq 'Successful'}
             if ($services) {
-                Update-ServiceStatus -ServiceCollection $services -Action 'restart' -Timeout $Timeout -EnableException $EnableException
+                Update-ServiceStatus -InputObject $services -Action 'restart' -Timeout $Timeout -EnableException $EnableException
             }
         }
         else { Stop-Function -EnableException $EnableException -Message "No SQL Server services found with current parameters." }

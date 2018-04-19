@@ -28,13 +28,7 @@ function Test-DbaDiskAlignment {
             $cred = Get-Credential, then pass $cred object to the -Credential parameter.
 
         .PARAMETER SQLCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER NoSqlCheck
             If this switch is enabled, the disk(s) will not be checked for SQL Server data or log files.
@@ -80,7 +74,7 @@ function Test-DbaDiskAlignment {
 
             dbatools PowerShell module (https://dbatools.io, clemaire@gmail.com,)
             Copyright (C) 2016 Chrissy LeMaire
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Test-DbaDiskAlignment
@@ -93,7 +87,8 @@ function Test-DbaDiskAlignment {
         [System.Management.Automation.PSCredential]$Credential,
         [System.Management.Automation.PSCredential]$SqlCredential,
         [switch]$NoSqlCheck,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
     begin {
         Test-DbaDeprecation -DeprecatedOn "1.0.0" -Parameter 'Detailed'

@@ -68,7 +68,7 @@ function Backup-DbaDatabase {
             .PARAMETER Verify
                 If this switch is enabled, the backup will be verified by running a RESTORE VERIFYONLY against the SqlInstance
 
-            .PARAMETER DatabaseCollection
+            .PARAMETER InputObject
                 Internal parameter
 
             .PARAMETER AzureBaseUrl
@@ -99,7 +99,7 @@ function Backup-DbaDatabase {
 
                 Website: https://dbatools.io
                 Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-                License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+                License: MIT https://opensource.org/licenses/MIT
 
             .EXAMPLE
                 Backup-DbaDatabase -SqlInstance Server1 -Database HR, Finance
@@ -130,7 +130,7 @@ function Backup-DbaDatabase {
         [ValidateSet('Full', 'Log', 'Differential', 'Diff', 'Database')]
         [string]$Type = 'Database',
         [parameter(ParameterSetName = "NoPipe", Mandatory = $true, ValueFromPipeline = $true)]
-        [object[]]$DatabaseCollection,
+        [object[]]$InputObject,
         [switch]$CreateFolder,
         [int]$FileCount = 0,
         [switch]$CompressBackup,
@@ -142,7 +142,8 @@ function Backup-DbaDatabase {
         [string]$AzureBaseUrl,
         [string]$AzureCredential,
         [switch]$NoRecovery,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
@@ -158,14 +159,14 @@ function Backup-DbaDatabase {
             }
 
             if ($Database) {
-                $DatabaseCollection = $server.Databases | Where-Object { $_.Name -in $Database }
+                $InputObject = $server.Databases | Where-Object { $_.Name -in $Database }
             }
             else {
-                $DatabaseCollection = $server.Databases | Where-object { $_.Name -ne 'tempdb' }
+                $InputObject = $server.Databases | Where-object { $_.Name -ne 'tempdb' }
             }
 
             if ($ExcludeDatabase) {
-                $DatabaseCollection = $DatabaseCollection | Where-Object Name -notin $ExcludeDatabase
+                $InputObject = $InputObject | Where-Object Name -notin $ExcludeDatabase
             }
 
             if ($BackupDirectory.count -gt 1) {
@@ -173,7 +174,7 @@ function Backup-DbaDatabase {
                 $Filecount = $BackupDirectory.count
             }
 
-            if ($DatabaseCollection.count -gt 1 -and $BackupFileName -ne '') {
+            if ($InputObject.count -gt 1 -and $BackupFileName -ne '') {
                 Write-Message -Level Warning -Message "1 BackupFile specified, but more than 1 database."
                 break
             }
@@ -201,14 +202,14 @@ function Backup-DbaDatabase {
     }
 
     process {
-        if (!$SqlInstance -and !$DatabaseCollection) {
+        if (!$SqlInstance -and !$InputObject) {
             Write-Message -Level Warning -Message "You must specify a server and database or pipe some databases"
             continue
         }
 
-        Write-Message -Level Verbose -Message "$($DatabaseCollection.count) database to backup"
+        Write-Message -Level Verbose -Message "$($InputObject.count) database to backup"
 
-        ForEach ($Database in $databasecollection) {
+        ForEach ($Database in $InputObject) {
             $failures = @()
             $dbname = $Database.name
 

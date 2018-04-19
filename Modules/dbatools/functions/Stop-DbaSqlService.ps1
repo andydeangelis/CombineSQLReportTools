@@ -24,7 +24,7 @@ function Stop-DbaSqlService {
     .PARAMETER Timeout
     How long to wait for the start/stop request completion before moving on. Specify 0 to wait indefinitely.
 
-    .PARAMETER ServiceCollection
+    .PARAMETER InputObject
     A collection of services from Get-DbaSqlService
 
     .PARAMETER Force
@@ -49,7 +49,7 @@ function Stop-DbaSqlService {
     Tags:
     dbatools PowerShell module (https://dbatools.io)
     Copyright (C) 2017 Chrissy LeMaire
-    License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+    License: MIT https://opensource.org/licenses/MIT
 
     .LINK
     https://dbatools.io/Stop-DbaSqlService
@@ -90,11 +90,13 @@ function Stop-DbaSqlService {
         [ValidateSet("Agent", "Browser", "Engine", "FullText", "SSAS", "SSIS", "SSRS")]
         [string[]]$Type,
         [parameter(ValueFromPipeline = $true, Mandatory = $true, ParameterSetName = "Service")]
-        [object[]]$ServiceCollection,
+        [Alias("ServiceCollection")]
+        [object[]]$InputObject,
         [int]$Timeout = 30,
         [PSCredential]$Credential,
         [switch]$Force,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
     begin {
         $processArray = @()
@@ -104,12 +106,12 @@ function Stop-DbaSqlService {
             if ($Type) { $serviceParams.Type = $Type }
             if ($Credential) { $serviceParams.Credential = $Credential }
             if ($EnableException) { $serviceParams.Silent = $EnableException }
-            $serviceCollection = Get-DbaSqlService @serviceParams
+            $InputObject = Get-DbaSqlService @serviceParams
         }
     }
     process {
         #Get all the objects from the pipeline before proceeding
-        $processArray += $serviceCollection
+        $processArray += $InputObject
     }
     end {
         $processArray = [array]($processArray | Where-Object { (!$InstanceName -or $_.InstanceName -in $InstanceName) -and (!$Type -or $_.ServiceType -in $Type) })
@@ -127,7 +129,7 @@ function Stop-DbaSqlService {
             }
         }
         if ($processArray) {
-            Update-ServiceStatus -ServiceCollection $processArray -Action 'stop' -Timeout $Timeout -EnableException $EnableException
+            Update-ServiceStatus -InputObject $processArray -Action 'stop' -Timeout $Timeout -EnableException $EnableException
         }
         else { Stop-Function -EnableException $EnableException -Message "No SQL Server services found with current parameters." -Category ObjectNotFound }
     }

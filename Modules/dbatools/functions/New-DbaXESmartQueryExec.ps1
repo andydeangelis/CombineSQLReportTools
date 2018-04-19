@@ -10,13 +10,7 @@
             Target SQL Server. You must have sysadmin access and server version must be SQL Server version 2008 or higher.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Database
             Specifies the name of the database that contains the target table.
@@ -26,6 +20,12 @@
 
             Placeholders are in the form {PropertyName}, where PropertyName is one of the fields or actions available in the Event object.
 
+        .PARAMETER Event
+            Each Response can be limited to processing specific events, while ignoring all the other ones. When this attribute is omitted, all events are processed.
+
+        .PARAMETER Filter
+            You can specify a filter expression by using this attribute. The filter expression is in the same form that you would use in a SQL query. For example, a valid example looks like this: duration > 10000 AND cpu_time > 10000
+            
         .PARAMETER EnableException
             By default, when something goes wrong we try to catch it, interpret it and give you a friendly warning message.
             This avoids overwhelming you with "sea of red" exceptions, but is inconvenient because it basically disables advanced scripting.
@@ -35,7 +35,7 @@
             Tags: ExtendedEvent, XE, Xevent
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/New-DbaXESmartQueryExec
@@ -55,7 +55,9 @@
         [PSCredential]$SqlCredential,
         [string]$Database,
         [string]$Query,
-        [switch]$EnableException
+        [switch]$EnableException,
+        [string[]]$Event,
+        [string]$Filter
     )
     begin {
         try {
@@ -88,6 +90,13 @@
             if ($SqlCredential) {
                 $execute.UserName = $SqlCredential.UserName
                 $execute.Password = $SqlCredential.GetNetworkCredential().Password
+            }
+
+            if (Test-Bound -ParameterName "Event") {
+                $execute.Events = $Event
+            }
+            if (Test-Bound -ParameterName "Filter") {
+                $execute.Filter = $Filter
             }
 
             $execute

@@ -10,13 +10,7 @@ function Test-DbaValidLogin {
             The SQL Server instance you're checking logins on. You must have sysadmin access and server version must be SQL Server version 2000 or higher.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Login
             Specifies a list of logins to include in the results. Options for this list are auto-populated from the server.
@@ -44,7 +38,7 @@ function Test-DbaValidLogin {
 
             dWebsite: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Test-DbaValidLogin
@@ -77,7 +71,8 @@ function Test-DbaValidLogin {
         [string]$FilterBy = "None",
         [string[]]$IgnoreDomains,
         [switch]$Detailed,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
@@ -119,8 +114,7 @@ function Test-DbaValidLogin {
             try {
                 $server = Connect-SqlInstance -SqlInstance $instance -SqlCredential $sqlcredential
                 Write-Message -Message "Connected to: $instance." -Level Verbose
-            }
-            catch {
+            } catch {
                 Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue
             }
 
@@ -173,8 +167,7 @@ function Test-DbaValidLogin {
                         Write-Message -Message "SID mismatch detected for $adLogin (MSSQL: $loginSid, AD: $foundSid)." -Level Debug
                         $exists = $false
                     }
-                }
-                catch {
+                } catch {
                     Write-Message -Message "AD Searcher Error for $username." -Level Warning
                 }
 
@@ -241,21 +234,20 @@ function Test-DbaValidLogin {
                 }
                 Write-Message -Message "Parsing Login $adLogin on $server." -Level Verbose
                 $exists = $false
-                if ($true) {
+                try {
                     $u = Get-DbaADObject -ADObject $adLogin -Type Group -EnableException
                     $foundUser = $u.GetUnderlyingObject()
+                    $foundSid = $foundUser.objectSid.Value -join ''
                     if ($foundUser) {
                         $exists = $true
                     }
-                    $foundSid = $foundUser.objectSid.Value -join ''
                     if ($foundSid -ne $loginSid) {
                         Write-Message -Message "SID mismatch detected for $adLogin." -Level Warning
                         Write-Message -Message "SID mismatch detected for $adLogin (MSSQL: $loginSid, AD: $foundSid)." -Level Debug
                         $exists = $false
                     }
-                }
-                else {
-                    Write-Warning -Message "AD Searcher Error for $groupName on $server" -Level Warning
+                } catch {
+                    Write-Message -Message "AD Searcher Error for $groupName on $server" -Level Warning
                 }
                 $rtn = [PSCustomObject]@{
                     Server                            = $server.DomainInstanceName

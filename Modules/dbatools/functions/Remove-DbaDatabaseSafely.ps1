@@ -12,25 +12,13 @@ function Remove-DbaDatabaseSafely {
             The SQL Server instance holding the databases to be removed. You must have sysadmin access and server version must be SQL Server version 2000 or higher.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SourceSqlCredential parameter.
-
-            Windows Authentication will be used if SourceSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Destination
             If specified, Agent jobs will be created on this server. By default, the jobs will be created on the server specified by SqlInstance. You must have sysadmin access and the server must be SQL Server 2000 or higher. The SQL Agent service will be started if it is not already running.
 
         .PARAMETER DestinationCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $dcred = Get-Credential, then pass this $dcred to the -DestinationSqlCredential parameter.
-
-            Windows Authentication will be used if DestinationSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Database
             Specifies one or more databases to remove.
@@ -81,7 +69,7 @@ function Remove-DbaDatabaseSafely {
 
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Remove-DbaDatabaseSafely
@@ -149,12 +137,13 @@ function Remove-DbaDatabaseSafely {
         [string]$BackupCompression = 'Default',
         [switch]$ReuseSourceFolderStructure,
         [switch]$Force,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
         if (!$AllDatabases -and !$Database) {
-            Stop-Function -Message "You must specify at least one database. Use -Database or -AllDatabases." -InnerErrorRecord $_
+            Stop-Function -Message "You must specify at least one database. Use -Database or -AllDatabases." -ErrorRecord $_
             return
         }
 
@@ -169,11 +158,11 @@ function Remove-DbaDatabaseSafely {
 
             $destserver = Connect-SqlInstance -SqlInstance $destination -SqlCredential $DestinationCredential
 
-            $sourcenb = $sourceserver.ComputerNamePhysicalNetBIOS
-            $destnb = $sourceserver.ComputerNamePhysicalNetBIOS
+            $sourcenb = $instance.ComputerName
+            $destnb = $instance.ComputerName
 
             if ($BackupFolder.StartsWith("\\") -eq $false -and $sourcenb -ne $destnb) {
-                Stop-Function -Message "Backup folder must be a network share if the source and destination servers are not the same." -InnerErrorRecord $_ -Target $backupFolder
+                Stop-Function -Message "Backup folder must be a network share if the source and destination servers are not the same." -ErrorRecord $_ -Target $backupFolder
                 return
             }
         }
@@ -194,14 +183,14 @@ function Remove-DbaDatabaseSafely {
 
         if (!(Test-DbaSqlPath -SqlInstance $destserver -Path $backupFolder)) {
             $serviceaccount = $destserver.ServiceAccount
-            Stop-Function -Message "Can't access $backupFolder Please check if $serviceaccount has permissions." -InnerErrorRecord $_ -Target $backupFolder
+            Stop-Function -Message "Can't access $backupFolder Please check if $serviceaccount has permissions." -ErrorRecord $_ -Target $backupFolder
         }
 
         $jobname = "Rationalised Final Database Restore for $dbname"
         $jobStepName = "Restore the $dbname database from Final Backup"
 
         if (!($destserver.Logins | Where-Object { $_.Name -eq $jobowner })) {
-            Stop-Function -Message "$destination does not contain the login $jobowner - Please fix and try again - Aborting." -InnerErrorRecord $_ -Target $jobowner
+            Stop-Function -Message "$destination does not contain the login $jobowner - Please fix and try again - Aborting." -ErrorRecord $_ -Target $jobowner
         }
 
         function Start-SqlAgent {
@@ -236,8 +225,7 @@ function Remove-DbaDatabaseSafely {
                 }
 
                 catch {
-                    Stop-Function -Message "Error occurred: $_" -Target $agentservice -InnerExceptionRecord $_
-                    return
+                    throw $_
                 }
 
                 if ($agentservice.Status -ne 'Running') {
@@ -269,7 +257,7 @@ function Remove-DbaDatabaseSafely {
 
                 catch {
                     Write-Message -Level Warning -Message "DBCC CHECKDB failed."
-                    Stop-Function -Message "Error occured: $_" -Target $agentservice -InnerExceptionRecord $_ -Continue
+                    Stop-Function -Message "Error occured: $_" -Target $agentservice -ErrorRecord $_ -Continue
 
                     if ($force) {
                         return $true
@@ -301,7 +289,7 @@ function Remove-DbaDatabaseSafely {
                         Write-Message -Level Verbose -Message "Created Agent Job Category $categoryname."
                     }
                     catch {
-                        Stop-Function -Message "FAILED : To Create Agent Job Category - $categoryname - Aborting." -Target $categoryname -InnerExceptionRecord $_
+                        Stop-Function -Message "FAILED : To Create Agent Job Category - $categoryname - Aborting." -Target $categoryname -ErrorRecord $_
                         return
                     }
                 }
@@ -394,8 +382,14 @@ function Remove-DbaDatabaseSafely {
         if (Test-FunctionInterrupt) {
             return
         }
-        Start-SqlAgent
-
+        try {
+            Start-SqlAgent
+        }
+        catch {
+            Stop-Function -Message "Failure starting SQL Agent" -ErrorRecord $_
+            return
+        }
+        
         $start = Get-Date
         Write-Message -Level Verbose -Message "Starting Rationalisation Script at $start."
 
@@ -427,7 +421,7 @@ function Remove-DbaDatabaseSafely {
                     $choice = $host.UI.PromptForChoice($Title, $Info, $Options, $Defaultchoice)
                     # Check the given option
                     if ($choice -eq 1) {
-                        Stop-Function -Message "You have chosen skipping the database $dbname because of last known backup time ($lastFullBckDurationMin minutes)." -InnerErrorRecord $_ -Target $dbname -Continue
+                        Stop-Function -Message "You have chosen skipping the database $dbname because of last known backup time ($lastFullBckDurationMin minutes)." -ErrorRecord $_ -Target $dbname -Continue
                         Continue
                     }
                 }
@@ -525,11 +519,11 @@ function Remove-DbaDatabaseSafely {
                         Write-Message -Level Verbose -Message "Restore Verify Only for $filename succeeded."
                     }
                     catch {
-                        Stop-Function -Message "FAILED : Restore Verify Only failed for $filename on $server - aborting routine for this database. Exception: $_" -Target $filename -InnerExceptionRecord $_ -Continue
+                        Stop-Function -Message "FAILED : Restore Verify Only failed for $filename on $server - aborting routine for this database. Exception: $_" -Target $filename -ErrorRecord $_ -Continue
                     }
                 }
                 catch {
-                    Stop-Function -Message "FAILED : Restore Verify Only failed for $filename on $server - aborting routine for this database. Exception: $_" -Target $filename -InnerExceptionRecord $_ -Continue
+                    Stop-Function -Message "FAILED : Restore Verify Only failed for $filename on $server - aborting routine for this database. Exception: $_" -Target $filename -ErrorRecord $_ -Continue
                 }
             }
 
@@ -559,7 +553,7 @@ function Remove-DbaDatabaseSafely {
                         }
                     }
                     catch {
-                        Stop-Function -Message "FAILED : To Create Agent Job $jobname on $destination - aborting routine for this database." -Target $categoryname -InnerExceptionRecord $_ -Continue
+                        Stop-Function -Message "FAILED : To Create Agent Job $jobname on $destination - aborting routine for this database." -Target $categoryname -ErrorRecord $_ -Continue
                     }
 
                     ## Create Job Step
@@ -594,7 +588,7 @@ function Remove-DbaDatabaseSafely {
                         Write-Message -Level Verbose -Message "Created Agent JobStep $jobStepName on $destination."
                     }
                     catch {
-                        Stop-Function -Message "FAILED : To Create Agent JobStep $jobStepName on $destination - Aborting." -Target $jobStepName -InnerExceptionRecord $_ -Continue
+                        Stop-Function -Message "FAILED : To Create Agent JobStep $jobStepName on $destination - Aborting." -Target $jobStepName -ErrorRecord $_ -Continue
                     }
                     if ($Pscmdlet.ShouldProcess($destination, "Applying Agent Job $jobname to $destination")) {
                         $job.ApplyToTargetServer($destination)
@@ -603,15 +597,14 @@ function Remove-DbaDatabaseSafely {
                     }
                 }
                 catch {
-                    Stop-Function -Message "FAILED : To Create Agent Job $jobname on $destination - aborting routine for $dbname. Exception: $_" -Target $jobname -InnerExceptionRecord $_ -Continue
+                    Stop-Function -Message "FAILED : To Create Agent Job $jobname on $destination - aborting routine for $dbname. Exception: $_" -Target $jobname -ErrorRecord $_ -Continue
                 }
             }
 
             if ($Pscmdlet.ShouldProcess($destination, "Dropping Database $dbname on $sourceserver")) {
                 ## Drop the database
                 try {
-                    # Remove-SqlDatabase is a function in SharedFunctions.ps1 that tries 3 different ways to drop a database
-                    Remove-SqlDatabase -SqlInstance $sourceserver -DbName $dbname
+                    $null = Remove-DbaDatabase -SqlInstance $sourceserver -Database $dbname -Confirm:$false
                     Write-Message -Level Verbose -Message "Dropped $dbname Database on $source prior to running the Agent Job"
                 }
                 catch {
@@ -647,7 +640,7 @@ function Remove-DbaDatabaseSafely {
                     # LOL, love the plug.
                     Write-Message -Level Warning -Message "FAILED : Restore Job $jobname failed on $destination - aborting routine for $dbname."
                     Write-Message -Level Warning -Message "Check the Agent Job History on $destination - if you have SSMS2016 July release or later."
-                    Write-Message -Level Warning -Message "Get-SqlAgentJobHistory -JobName $jobname -ServerInstance $destination -OutcomesType Failed."
+                    Write-Message -Level Warning -Message "Get-SqlAgentJobHistory -JobName '$jobname' -ServerInstance $destination -OutcomesType Failed."
                     continue
                 }
             }
@@ -675,11 +668,11 @@ function Remove-DbaDatabaseSafely {
             if ($Pscmdlet.ShouldProcess($dbname, "Dropping Database $dbname on $destination")) {
                 ## Drop the database
                 try {
-                    $null = Remove-SqlDatabase -SqlInstance $sourceserver -DbName $dbname
+                    $null = Remove-DbaDatabase -SqlInstance $sourceserver -Database $dbname -Confirm:$false
                     Write-Message -Level Verbose -Message "Dropped $dbname database on $destination."
                 }
                 catch {
-                    Stop-Function -Message "FAILED : To Drop database $dbname on $destination - Aborting. Exception: $_" -Target $dbname -InnerExceptionRecord $_ -Continue
+                    Stop-Function -Message "FAILED : To Drop database $dbname on $destination - Aborting. Exception: $_" -Target $dbname -ErrorRecord $_ -Continue
                 }
             }
             Write-Message -Level Verbose -Message "Rationalisation Finished for $dbname."
@@ -693,8 +686,11 @@ function Remove-DbaDatabaseSafely {
             }
         }
     }
-
+    
     end {
+        if (Test-FunctionInterrupt) {
+            return
+        }
         if ($Pscmdlet.ShouldProcess("console", "Showing final message")) {
             $End = Get-Date
             Write-Message -Level Verbose -Message "Finished at $End."

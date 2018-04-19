@@ -20,6 +20,10 @@ Import-Module -Name "$PSScriptRoot\Modules\dbatools\dbatools.psm1" -Scope Local 
 
 Import-Module -Name "$PSScriptRoot\Modules\ImportExcel\ImportExcel.psm1" -Scope Local -PassThru
 
+# Import the PoshRSJobs module.
+
+Import-Module -Name "$PSScriptRoot\Modules\PoshRSJob\PoshRSJob.psm1" -Scope Local -PassThru
+
 # Source the Get-SQLInstances02 function. The included Get-SQLInstance cmdlet is lacking, and it requires the SQL Cloud adapter to run.
 # The SQL Cloud Adapter is primarily for Azure instances, and does not exist in the feature pack for SQL 2016.
  

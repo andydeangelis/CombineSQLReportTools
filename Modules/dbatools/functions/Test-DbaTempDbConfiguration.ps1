@@ -18,13 +18,7 @@ function Test-DbaTempDbConfiguration {
             The SQL Server Instance to connect to. SQL Server 2005 and higher are supported.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Detailed
             Output all properties, will be depreciated in 1.0.0 release.
@@ -41,7 +35,7 @@ function Test-DbaTempDbConfiguration {
 
             dbatools PowerShell module (https://dbatools.io, clemaire@gmail.com)
             Copyright (C) 2016 Chrissy LeMaire
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Test-DbaTempDbConfiguration
@@ -63,7 +57,8 @@ function Test-DbaTempDbConfiguration {
         [DbaInstance[]]$SqlInstance,
         [PSCredential]$SqlCredential,
         [switch]$Detailed,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
     begin {
         Test-DbaDeprecation -DeprecatedOn 1.0.0 -Parameter Detailed
@@ -98,25 +93,13 @@ function Test-DbaTempDbConfiguration {
                 $tfCheck = $server.Databases['tempdb'].Query($sql)
                 $notes = 'KB328551 describes how TF 1118 can benefit performance.'
 
-                if (($tfCheck.TraceFlag -join ',').Contains('1118')) {
-                    $value = [PSCustomObject]@{
-                        ComputerName   = $server.NetName
-                        InstanceName   = $server.ServiceName
-                        SqlInstance    = $server.DomainInstanceName
-                        Rule           = 'TF 1118 Enabled'
-                        Recommended    = $true
-                        CurrentSetting = $true
-                    }
-                }
-                else {
-                    $value = [PSCustomObject]@{
-                        ComputerName   = $server.NetName
-                        InstanceName   = $server.ServiceName
-                        SqlInstance    = $server.DomainInstanceName
-                        Rule           = 'TF 1118 Enabled'
-                        Recommended    = $true
-                        CurrentSetting = $false
-                    }
+                $value = [PSCustomObject]@{
+                    ComputerName   = $server.NetName
+                    InstanceName   = $server.ServiceName
+                    SqlInstance    = $server.DomainInstanceName
+                    Rule           = 'TF 1118 Enabled'
+                    Recommended    = $true
+                    CurrentSetting = ($tfCheck.TraceFlag -join ',').Contains('1118')
                 }
             }
 
@@ -138,17 +121,12 @@ function Test-DbaTempDbConfiguration {
             $logFiles = $tempdbFiles | Where-Object Type -eq 1
             Write-Message -Level Verbose -Message "TempDB file objects gathered"
 
-            $cores = $server.Processors
-            if ($cores -gt 8) {
-                $cores = 8
-            }
-
             $value = [PSCustomObject]@{
                 ComputerName   = $server.NetName
                 InstanceName   = $server.ServiceName
                 SqlInstance    = $server.DomainInstanceName
                 Rule           = 'File Count'
-                Recommended    = $cores
+                Recommended    = [Math]::Min(8, $server.Processors)
                 CurrentSetting = $dataFiles.Count
             }
 

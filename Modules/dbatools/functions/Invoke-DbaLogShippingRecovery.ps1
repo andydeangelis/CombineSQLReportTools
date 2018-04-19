@@ -26,12 +26,7 @@ function Invoke-DbaLogShippingRecovery {
         If this value is not supplied all databases will be recovered.
 
     .PARAMETER SqlCredential
-        Allows you to login to servers using SQL Logins as opposed to Windows Auth/Integrated/Trusted. To use:
-
-        $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-        Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-        To connect as a different Windows user, run PowerShell as that user.
+        Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
     .PARAMETER NoRecovery
         Allows you to choose to not restore the database to a functional state (Normal) in the final steps of the process.
@@ -86,7 +81,7 @@ function Invoke-DbaLogShippingRecovery {
 
         Website: https://dbatools.io
         Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-        License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+        License: MIT https://opensource.org/licenses/MIT
 
     .LINK
         https://dbatools.io/Invoke-DbaLogShippingRecovery
@@ -101,7 +96,8 @@ function Invoke-DbaLogShippingRecovery {
         [object[]]$Database,
         [PSCredential]$SqlCredential,
         [switch]$NoRecovery,
-        [switch][Alias('Silent')]$EnableException,
+        [Alias('Silent')]
+        [switch]$EnableException,
         [switch]$Force,
         [int]$Delay = 5
     )

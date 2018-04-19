@@ -13,19 +13,13 @@ function Set-DbaTempDbConfiguration {
 
             dbatools PowerShell module (https://dbatools.io, clemaire@gmail.com)
             Copyright (C) 2016 Chrissy LeMaire
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .PARAMETER SqlInstance
             The SQL Server Instance to connect to.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER DataFileCount
             Specifies the number of data files to create. If this number is not specified, the number of logical cores of the host will be used.
@@ -113,7 +107,8 @@ function Set-DbaTempDbConfiguration {
         [string]$OutFile,
         [switch]$OutputScriptOnly,
         [switch]$DisableGrowth,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
     begin {
         $sql = @()
@@ -266,7 +261,6 @@ function Set-DbaTempDbConfiguration {
                     Write-Message -Level Output -Message "tempdb reconfigured. You must restart the SQL Service for settings to take effect."
                 }
                 catch {
-                    # write-exception writes the full exception to file
                     Stop-Function -Message "Unable to reconfigure tempdb. Exception: $_" -Target $sql -InnerErrorRecord $_
                     return
                 }

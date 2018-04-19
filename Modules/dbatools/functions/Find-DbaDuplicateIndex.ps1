@@ -32,13 +32,7 @@ function Find-DbaDuplicateIndex {
             The SQL Server you want to check for duplicate indexes.
 
         .PARAMETER SqlCredential
-             Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $cred = Get-Credential, then pass $cred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+             Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Database
             The database(s) to process. Options for this list are auto-populated from the server. If unspecified, all databases will be processed.
@@ -66,18 +60,18 @@ function Find-DbaDuplicateIndex {
             Author: Claudio Silva (@ClaudioESSilva)
             dbatools PowerShell module (https://dbatools.io, clemaire@gmail.com)
             Copyright (C) 2016 Chrissy LeMaire
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Find-DbaDuplicateIndex
 
         .EXAMPLE
-            Find-DbaDuplicateIndex -SqlInstance sql2005 -FilePath C:\temp\sql2005-DuplicateIndexes.sql
+            Find-DbaDuplicateIndex -SqlInstance sql2005 | Out-File -FilePath C:\temp\sql2005-DuplicateIndexes.sql
 
             Generates SQL statements to drop the selected duplicate indexes in server "sql2005" and writes them to the file "C:\temp\sql2005-DuplicateIndexes.sql"
 
         .EXAMPLE
-            Find-DbaDuplicateIndex -SqlInstance sql2005 -FilePath C:\temp\sql2005-DuplicateIndexes.sql -Append
+            Find-DbaDuplicateIndex -SqlInstance sql2005 | Out-File -FilePath C:\temp\sql2005-DuplicateIndexes.sql -Append
 
             Generates SQL statements to drop the selected duplicate indexes and writes/appends them to the file "C:\temp\sql2005-DuplicateIndexes.sql"
 

@@ -72,14 +72,14 @@ For -Detached it is required to break mirroring and Availability Groups
         This avoids overwhelming you with "sea of red" exceptions, but is inconvenient because it basically disables advanced scripting.
         Using this switch turns this "nice by default" feature off and enables you to catch exceptions with your own try/catch.
 
-.PARAMETER DatabaseCollection
-Internal parameter for piped objects - this will likely go away once we move to better dynamic parameters
+.PARAMETER InputObject
+Accepts piped database objects
 
 .NOTES
 Author: niphlod
 Website: https://dbatools.io
 Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+License: MIT https://opensource.org/licenses/MIT
 
 .LINK
 https://dbatools.io/Set-DbaDatabaseState
@@ -138,9 +138,10 @@ Gets the databases from Get-DbaDatabase, and sets them as SINGLE_USER, dropping 
         [switch]$RestrictedUser,
         [switch]$MultiUser,
         [switch]$Force,
-        [switch][Alias('Silent')]$EnableException,
+        [Alias('Silent')]
+        [switch]$EnableException,
         [parameter(Mandatory = $true, ValueFromPipeline, ParameterSetName = "Database")]
-        [PsCustomObject[]]$DatabaseCollection
+        [PsCustomObject[]]$InputObject
     )
 
     begin {
@@ -182,31 +183,16 @@ Gets the databases from Get-DbaDatabase, and sets them as SINGLE_USER, dropping 
             return $warn
         }
 
-        $UserAccessHash = @{
-            'Single'     = 'SINGLE_USER'
-            'Restricted' = 'RESTRICTED_USER'
-            'Multiple'   = 'MULTI_USER'
-        }
-        $ReadOnlyHash = @{
-            $true  = 'READ_ONLY'
-            $false = 'READ_WRITE'
-        }
         $StatusHash = @{
             'Offline'       = 'OFFLINE'
             'Normal'        = 'ONLINE'
             'EmergencyMode' = 'EMERGENCY'
         }
 
-        function Get-DbState($db) {
-            $base = [PSCustomObject]@{
-                'Access' = $null
-                'Status' = $null
-                'RW'     = $null
-            }
-            $base.RW = $ReadOnlyHash[$db.ReadOnly]
-            $base.Access = $UserAccessHash[$db.UserAccess.toString()]
+        function Get-DbState($databaseName, $dbStatuses) {
+            $base = $dbStatuses | Where-Object DatabaseName -ceq $databaseName
             foreach ($status in $StatusHash.Keys) {
-                if ($db.Status -match $status) {
+                if ($base.Status -match $status) {
                     $base.Status = $StatusHash[$status]
                     break
                 }
@@ -243,19 +229,19 @@ Gets the databases from Get-DbaDatabase, and sets them as SINGLE_USER, dropping 
     process {
         if (Test-FunctionInterrupt) { return }
         $dbs = @()
-        if (!$Database -and !$AllDatabases -and !$DatabaseCollection -and !$ExcludeDatabase) {
+        if (!$Database -and !$AllDatabases -and !$InputObject -and !$ExcludeDatabase) {
             Stop-Function -Message "You must specify a -AllDatabases or -Database to continue"
             return
         }
 
-        if ($DatabaseCollection) {
-            if ($DatabaseCollection.Database) {
+        if ($InputObject) {
+            if ($InputObject.Database) {
                 # comes from Get-DbaDatabaseState
-                $dbs += $DatabaseCollection.Database
+                $dbs += $InputObject.Database
             }
-            elseif ($DatabaseCollection.Name) {
+            elseif ($InputObject.Name) {
                 # comes from Get-DbaDatabase
-                $dbs += $DatabaseCollection
+                $dbs += $InputObject
             }
         }
         else {
@@ -285,9 +271,14 @@ Gets the databases from Get-DbaDatabase, and sets them as SINGLE_USER, dropping 
                 Write-Message -Level Warning -Message "Database $db is a system one, skipping"
                 Continue
             }
+            $dbStatuses = @{}
             $server = $db.Parent
+            if ($server -notin $dbStatuses.Keys) {
+                $dbStatuses[$server] = Get-DbaDatabaseState -SqlInstance $server
+            }
+
             # normalizing properties returned by SMO to something more "fixed"
-            $db_status = Get-DbState $db
+            $db_status = Get-DbState -DatabaseName $db.Name -dbStatuses $dbStatuses[$server]
 
 
             $warn = @()
@@ -469,7 +460,7 @@ Gets the databases from Get-DbaDatabase, and sets them as SINGLE_USER, dropping 
                 # we can do that here
                 if ($Pscmdlet.ShouldProcess($server, "Detaching $db")) {
                     if ($db_status.Status -ne 'OFFLINE') {
-                        $opstatus = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "OFFLINE" -immediate $true
+                        $null = Edit-DatabaseState -sqlinstance $server -dbname $db.Name -opt "OFFLINE" -immediate $true
                     }
                     try {
                         $sql = "EXEC master.dbo.sp_detach_db N'$($db.Name)'"
@@ -512,7 +503,7 @@ Gets the databases from Get-DbaDatabase, and sets them as SINGLE_USER, dropping 
                     $newstate = $db_status
                 }
                 else {
-                    $newstate = Get-DbState $db
+                    $newstate = Get-DbState -databaseName $db.Name -dbStatuses $stateCache[$server]
                 }
 
                 [PSCustomObject]@{

@@ -27,7 +27,7 @@ function Get-DbaComputerSystem {
 
             Website: https: //dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https: //opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Get-DbaComputerSystem
@@ -151,7 +151,7 @@ function Get-DbaComputerSystem {
                 Select-DefaultView -InputObject $inputObject -ExcludeProperty $excludes
             }
             catch {
-                Stop-Function -Continue -Message "Failure" -ErrorRecord $_ -Target $computer -Continue
+                Stop-Function -Message "Failure" -ErrorRecord $_ -Target $computer -Continue
             }
         }
     }

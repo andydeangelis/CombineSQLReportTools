@@ -12,13 +12,7 @@ function Get-DbaRestoreHistory {
             Specifies the SQL Server instance(s) to operate on. Requires SQL Server 2005 or higher.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Database
             Specifies the database(s) to process. Options for this list are auto-populated from the server. If unspecified, all databases will be processed.
@@ -34,13 +28,18 @@ function Get-DbaRestoreHistory {
 
         .PARAMETER Last
             If this switch is enabled, the last restore action performed on each database is returned.
+        
+        .PARAMETER EnableException
+            By default, when something goes wrong we try to catch it, interpret it and give you a friendly warning message.
+            This avoids overwhelming you with "sea of red" exceptions, but is inconvenient because it basically disables advanced scripting.
+            Using this switch turns this "nice by default" feature off and enables you to catch exceptions with your own try/catch.
 
         .NOTES
             Tags: DisasterRecovery, Backup, Restore, Databases
 
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Get-DbaRestoreHistory
@@ -83,7 +82,9 @@ function Get-DbaRestoreHistory {
         [object[]]$ExcludeDatabase,
         [datetime]$Since,
         [switch]$Force,
-        [switch]$Last
+        [switch]$Last,
+        [switch][Alias('Silent')]
+        $EnableException
     )
 
     begin {
@@ -97,13 +98,7 @@ function Get-DbaRestoreHistory {
     process {
         foreach ($instance in $SqlInstance) {
             try {
-                $server = Connect-SqlInstance -SqlInstance $instance -SqlCredential $SqlCredential
-
-                if ($server.VersionMajor -lt 9) {
-                    Write-Warning "SQL Server 2000 not supported."
-                    continue
-                }
-
+                $server = Connect-SqlInstance -SqlInstance $instance -SqlCredential $SqlCredential -MinimumVersion 9
                 $computername = $server.NetName
                 $instancename = $server.ServiceName
                 $servername = $server.DomainInstanceName
@@ -186,7 +181,7 @@ function Get-DbaRestoreHistory {
 
                 $sql = "$select $from $where"
 
-                Write-Debug $sql
+                Write-Message -Level Debug -Message $sql
 
                 $results = $server.ConnectionContext.ExecuteWithResults($sql).Tables.Rows
 
@@ -198,14 +193,11 @@ function Get-DbaRestoreHistory {
                     }
                     $results = $tmpres
                 }
-                $results | Select-DefaultView -Exclude first_lsn, last_lsn, checkpoint_lsn, database_backup_lsn, RowError, RowState, Table, ItemArray, HasErrors
+                Select-DefaultView -InputObject $results -Exclude first_lsn, last_lsn, checkpoint_lsn, database_backup_lsn, RowError, RowState, Table, ItemArray, HasErrors
             }
             catch {
-                Write-Warning $_
-                Write-Exception $_
-                continue
+                Stop-Function -Message "Failure" -Target $SqlInstance -Error $_ -Exception $_.Exception.InnerException -Continue
             }
         }
     }
 }
-

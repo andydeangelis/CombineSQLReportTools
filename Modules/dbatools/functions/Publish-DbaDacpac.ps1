@@ -10,13 +10,7 @@ function Publish-DbaDacpac {
             SQL Server name or SMO object representing the SQL Server to connect to.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Path
             Specifies the filesystem path to the DACPAC
@@ -50,13 +44,16 @@ function Publish-DbaDacpac {
             This avoids overwhelming you with "sea of red" exceptions, but is inconvenient because it basically disables advanced scripting.
             Using this switch turns this "nice by default" feature off and enables you to catch exceptions with your own try/catch.
 
+        .PARAMETER DacFxPath
+            Path to the dac dll. If this is ommited, then the version of dac dll which is packaged with dbatools is used.
+
         .NOTES
             Tags: Migration, Database, Dacpac
             Author: Richie lee (@bzzzt_io)
 
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Publish-DbaDacpac
@@ -72,7 +69,10 @@ function Publish-DbaDacpac {
 
             Creates a publish profile at C:\temp\sql2016-db2-publish.xml, exports the .dacpac to $home\Documents\sql2016-db2.dacpac
             then publishes it to the sql2017 server database db2
-
+        
+        .EXAMPLE
+        $loc = "C:\Users\bob\source\repos\Microsoft.Data.Tools.Msbuild\lib\net46\Microsoft.SqlServer.Dac.dll"
+        Publish-DbaDacpac -SqlInstance "local" -Database WideWorldImporters -Path C:\temp\WideWorldImporters.dacpac -PublishXml C:\temp\WideWorldImporters.publish.xml -DacFxPath $loc
   #>
     [CmdletBinding()]
     param (
@@ -92,7 +92,8 @@ function Publish-DbaDacpac {
         [Switch]$ScriptOnly,
         [string]$OutputPath = "$home\Documents",
         [switch]$IncludeSqlCmdVars,
-        [switch]$EnableException
+        [switch]$EnableException,
+        [String]$DacFxPath
     )
 
     begin {
@@ -120,8 +121,10 @@ function Publish-DbaDacpac {
 
             return $instance.ToString().Replace('\', '-')
         }
+        if (Test-Bound -Not -ParameterName 'DacfxPath'){
+            $dacfxPath = "$script:PSModuleRoot\bin\smo\Microsoft.SqlServer.Dac.dll"
+        }
 
-        $dacfxPath = "$script:PSModuleRoot\bin\smo\Microsoft.SqlServer.Dac.dll"
         if ((Test-Path $dacfxPath) -eq $false) {
             Stop-Function -Message 'No usable version of Dac Fx found.' -EnableException $EnableException
         }

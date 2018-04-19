@@ -13,34 +13,30 @@ function Copy-DbaCredential {
             Source SQL Server. You must have sysadmin access and server version must be SQL Server version 2000 or higher.
 
         .PARAMETER SourceSqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SourceSqlCredential parameter.
-
-            Windows Authentication will be used if SourceSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Destination
             Destination SQL Server. You must have sysadmin access and the server must be SQL Server 2000 or higher.
 
         .PARAMETER DestinationSqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $dcred = Get-Credential, then pass this $dcred to the -DestinationSqlCredential parameter.
-
-            Windows Authentication will be used if DestinationSqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Credential
              This command requires access to the Windows OS via PowerShell remoting. Use this credential to connect to Windows using alternative credentials.
 
-        .PARAMETER CredentialIdentity
-            Auto-populated list of Credentials from Source. If no Credential is specified, all Credentials will be migrated. If spaces exist in the credential name, it must be wrapped with quotes.
+        .PARAMETER Name
+            Only include specific names
+            Note: if spaces exist in the credential name, you will have to type "" or '' around it.
 
-        .PARAMETER ExcludeCredentialIdentity
-            Auto-populated list of Credentials from Source to be excluded from the migration.
+        .PARAMETER ExcludeName
+            Excluded credential names
+    
+        .PARAMETER Identity
+            Only include specific identities
+            Note: if spaces exist in the credential identity, you will have to type "" or '' around it.
+
+        .PARAMETER ExcludeIdentity
+            Excluded identities
 
         .PARAMETER Force
             If this switch is enabled, the Credential will be dropped and recreated if it already exists on Destination.
@@ -68,7 +64,7 @@ function Copy-DbaCredential {
 
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Copy-DbaCredential
@@ -79,7 +75,7 @@ function Copy-DbaCredential {
             Copies all SQL Server Credentials on sqlserver2014a to sqlcluster. If Credentials exist on destination, they will be skipped.
 
         .EXAMPLE
-            Copy-DbaCredential -Source sqlserver2014a -Destination sqlcluster -CredentialIdentity "PowerShell Proxy Account" -Force
+            Copy-DbaCredential -Source sqlserver2014a -Destination sqlcluster -Name "PowerShell Proxy Account" -Force
 
             Copies over one SQL Server Credential (PowerShell Proxy Account) from sqlserver to sqlcluster. If the Credential already exists on the destination, it will be dropped and recreated.
     #>
@@ -93,12 +89,16 @@ function Copy-DbaCredential {
         $Credential,
         [parameter(Mandatory = $true)]
         [DbaInstanceParameter]$Destination,
-        [PSCredential]
-        $DestinationSqlCredential,
-        [object[]]$CredentialIdentity,
-        [object[]]$ExcludeCredentialIdentity,
+        [PSCredential]$DestinationSqlCredential,
+        [string[]]$Name,
+        [string[]]$ExcludeName,
+        [Alias('CredentialIdentity')]
+        [string[]]$Identity,
+        [Alias('ExcludeCredentialIdentity')]
+        [string[]]$ExcludeIdentity,
         [switch]$Force,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
@@ -296,16 +296,8 @@ function Copy-DbaCredential {
 
             Write-Message -Level Verbose -Message "Collecting Credential logins and passwords on $($sourceServer.Name)"
             $sourceCredentials = Get-SqlCredential $sourceServer
-            $credentialList = $sourceServer.Credentials
-
-            if ($CredentialIdentity) {
-                $credentialList = $credentialList | Where-Object { $CredentialIdentity -contains $_.Name }
-            }
-
-            if ($ExcludeCredentialIdentity) {
-                $credentialList = $credentialList | Where-Object { $CredentialIdentity -notcontains $_.Name }
-            }
-
+            $credentialList = Get-DbaCredential -SqlInstance $sourceServer -Name $Name -ExcludeName $ExcludeName -Identity $Identity -ExcludeIdentity $ExcludeIdentity
+            
             Write-Message -Level Verbose -Message "Starting migration"
             foreach ($credential in $credentialList) {
                 $destServer.Credentials.Refresh()

@@ -24,7 +24,7 @@ function Get-DbaOperatingSystem {
 
             Website: https: //dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https: //opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
 
         .LINK
             https://dbatools.io/Get-DbaOperatingSystem
@@ -45,7 +45,8 @@ function Get-DbaOperatingSystem {
         [Alias("cn", "host", "Server")]
         [DbaInstanceParameter[]]$ComputerName = $env:COMPUTERNAME,
         [PSCredential]$Credential,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
     process {
         foreach ($computer in $ComputerName) {
@@ -116,6 +117,7 @@ function Get-DbaOperatingSystem {
                 Architecture             = $os.OSArchitecture
                 Version                  = $os.Version
                 Build                    = $os.BuildNumber
+                Caption                  = $os.Caption
                 InstallDate              = [DbaDateTime]$os.InstallDate
                 LastBootTime             = [DbaDateTime]$os.LastBootUpTime
                 LocalDateTime            = [DbaDateTime]$os.LocalDateTime
@@ -136,11 +138,10 @@ function Get-DbaOperatingSystem {
                 LanguageThreeLetter      = $language.ThreeLetterISOLanguageName
                 LanguageAlias            = $language.DisplayName
                 LanguageNative           = $language.NativeName
-
                 CodeSet                  = $os.CodeSet
                 CountryCode              = $os.CountryCode
                 Locale                   = $os.Locale
-            } | Select-DefaultView -ExcludeProperty CodeSet, CountryCode, Locale, LanguageAlias
+            } | Select-DefaultView -Property ComputerName, Manufacturer, Organization, Architecture, Version, Caption, LastBootTime, LocalDateTime, PowerShellVersion, TimeZone, TotalVisibleMemory, ActivePowerPlan, LanguageNative
         }
     }
 }

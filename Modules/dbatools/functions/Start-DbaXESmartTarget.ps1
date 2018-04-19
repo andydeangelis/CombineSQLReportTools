@@ -12,13 +12,7 @@
             Target SQL Server. You must have sysadmin access and server version must be SQL Server version 2008 or higher.
 
         .PARAMETER SqlCredential
-            Allows you to login to servers using SQL Logins instead of Windows Authentication (AKA Integrated or Trusted). To use:
-
-            $scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-            Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials.
-
-            To connect as a different Windows user, run PowerShell as that user.
+            Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
         .PARAMETER Session
             Name of the Extended Events session to attach to.
@@ -49,7 +43,7 @@
             Tags: ExtendedEvent, XE, Xevent
             Website: https://dbatools.io
             Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-            License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+            License: MIT https://opensource.org/licenses/MIT
             SmartTarget: by Gianluca Sartori (@spaghettidba)
 
         .LINK
@@ -157,7 +151,13 @@
                     }
                     catch {
                         $message = $_.Exception.InnerException.InnerException | Out-String
-                        Stop-Function -Message $message -Target "XESmartTarget" -Continue
+                        
+                        if ($message) {
+                            Stop-Function -Message $message -Target "XESmartTarget" -Continue
+                        }
+                        else {
+                            Stop-Function -Message "Failure" -Target "XESmartTarget" -ErrorRecord $_ -Continue
+                        }
                     }
                 }
             }
@@ -180,8 +180,35 @@
         }
         else {
             $date = (Get-Date -UFormat "%H%M%S") #"%m%d%Y%H%M%S"
-            Start-Job -Name "XESmartTarget-$session-$date" -ArgumentList $PSBoundParameters -ScriptBlock {
-                Start-DbaXESmartTarget -SqlInstance $args.SqlInstance.InputObject -SqlCredential $args.SqlCredential -Database $args.Database -Session $args.Session -NotAsJob -FailOnProcessingError
+            Start-Job -Name "XESmartTarget-$session-$date" -ArgumentList $PSBoundParameters, $script:PSModuleRoot -ScriptBlock {
+                param (
+                    $Parameters,
+                    $ModulePath
+                )
+                Import-Module "$ModulePath\dbatools.psd1"
+                Add-Type -Path "$ModulePath\bin\XESmartTarget\XESmartTarget.Core.dll" -ErrorAction Stop
+                $params = @{
+                    SqlInstance    = $Parameters.SqlInstance.InputObject
+                    Database       = $Parameters.Database
+                    Session        = $Parameters.Session
+                    Responder      = @()
+                }
+                if ($Parameters.SqlCredential) {
+                    $params["SqlCredential"] = $Parameters.SqlCredential
+                }
+                foreach ($responder in $Parameters.Responder) {
+                    $typename = $responder.PSObject.TypeNames[0] -replace "^Deserialized\.", ""
+                    $newResponder = New-Object -TypeName $typename
+                    foreach ($property in $responder.PSObject.Properties) {
+                        if ($property.Value) {
+                            $name = $property.Name
+                            $newResponder.$name = $property.Value
+                        }
+                    }
+                    $params["Responder"] += $newResponder
+                }
+                
+                Start-DbaXESmartTarget @params -NotAsJob -FailOnProcessingError
             } | Select-Object -Property ID, Name, State
         }
     }

@@ -10,16 +10,12 @@ Tries a bunch of different ways to remove a database or two or more.
 The SQL Server instance holding the databases to be removed.You must have sysadmin access and server version must be SQL Server version 2000 or higher.
 
 .PARAMETER SqlCredential
-Allows you to login to servers using SQL Logins as opposed to Windows Auth/Integrated/Trusted.
-
-$scred = Get-Credential, then pass $scred object to the -SqlCredential parameter.
-
-Windows Authentication will be used if SqlCredential is not specified. SQL Server does not accept Windows credentials being passed as credentials. To connect as a different Windows user, run PowerShell as that user.
+Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
 .PARAMETER Database
 The database(s) to process - this list is auto-populated from the server. If unspecified, all databases will be processed.
 
-.PARAMETER DatabaseCollection
+.PARAMETER InputObject
 A collection of databases (such as returned by Get-DbaDatabase), to be removed.
 
 .PARAMETER IncludeSystemDb
@@ -41,7 +37,7 @@ Tags: Delete, Databases
 
 Website: https://dbatools.io
 Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+License: MIT https://opensource.org/licenses/MIT
 
 .LINK
 https://dbatools.io/Remove-DbaDatabase
@@ -84,9 +80,10 @@ Removes all the user databases from server\instance without any confirmation
         [Alias("Databases")]
         [object[]]$Database,
         [Parameter(ValueFromPipeline, Mandatory, ParameterSetName = "databases")]
-        [Microsoft.SqlServer.Management.Smo.Database[]]$DatabaseCollection,
+        [Microsoft.SqlServer.Management.Smo.Database[]]$InputObject,
         [switch]$IncludeSystemDb,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     process {
@@ -99,16 +96,16 @@ Removes all the user databases from server\instance without any confirmation
             catch {
                 Stop-Function -Message "Failure" -Category ConnectionError -ErrorRecord $_ -Target $instance -Continue
             }
-            $databasecollection += $server.Databases | Where-Object { $_.Name -in $Database }
+            $InputObject += $server.Databases | Where-Object { $_.Name -in $Database }
         }
 
         $system_dbs = @( "master", "model", "tempdb", "resource", "msdb" )
 
         if (-not($IncludeSystemDb)) {
-            $databasecollection = $databasecollection | Where-Object { $_.Name -notin $system_dbs}
+            $InputObject = $InputObject | Where-Object { $_.Name -notin $system_dbs}
         }
 
-        foreach ($db in $databasecollection) {
+        foreach ($db in $InputObject) {
             try {
                 $server = $db.Parent
                 if ($Pscmdlet.ShouldProcess("$db on $server", "KillDatabase")) {

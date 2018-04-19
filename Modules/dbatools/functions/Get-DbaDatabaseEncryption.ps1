@@ -10,7 +10,7 @@ function Get-DbaDatabaseEncryption {
         SQL Server name or SMO object representing the SQL Server to connect to. This can be a collection and receive pipeline input.
 
     .PARAMETER SqlCredential
-        PSCredential object to connect as. If not specified, current Windows login will be used.
+        Login to the target instance using alternative credentials. Windows and SQL Authentication supported. Accepts credential objects (Get-Credential)
 
     .PARAMETER Database
         The database(s) to process - this list is auto-populated from the server. If unspecified, all databases will be processed.
@@ -30,7 +30,7 @@ function Get-DbaDatabaseEncryption {
         Author: Stephen Bennett, https://sqlnotesfromtheunderground.wordpress.com/
         Website: https://dbatools.io
         Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-        License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+        License: MIT https://opensource.org/licenses/MIT
 
     .LINK
         https://dbatools.io/Get-DbaDatabaseEncryption
@@ -66,7 +66,8 @@ function Get-DbaDatabaseEncryption {
         [object[]]$Database,
         [object[]]$ExcludeDatabase,
         [switch]$IncludeSystemDBs,
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     process {
@@ -112,7 +113,7 @@ function Get-DbaDatabaseEncryption {
                         InstanceName             = $server.ServiceName
                         SqlInstance              = $server.DomainInstanceName
                         Database                 = $db.Name
-                        Encryption               = "EncryptionEnabled (tde)"
+                        Encryption               = "EncryptionEnabled (TDE)"
                         Name                     = $null
                         LastBackup               = $null
                         PrivateKeyEncryptionType = $null
@@ -120,6 +121,7 @@ function Get-DbaDatabaseEncryption {
                         KeyLength                = $null
                         Owner                    = $null
                         Object                   = $null
+                        ExpirationDate           = $null
                     }
 
                 }
@@ -138,6 +140,7 @@ function Get-DbaDatabaseEncryption {
                         KeyLength                = $null
                         Owner                    = $cert.Owner
                         Object                   = $cert
+                        ExpirationDate           = $cert.ExpirationDate
                     }
 
                 }
@@ -148,7 +151,7 @@ function Get-DbaDatabaseEncryption {
                         InstanceName             = $server.ServiceName
                         SqlInstance              = $server.DomainInstanceName
                         Database                 = $db.Name
-                        Encryption               = "Asymentric key"
+                        Encryption               = "Asymmetric key"
                         Name                     = $ak.Name
                         LastBackup               = $null
                         PrivateKeyEncryptionType = $ak.PrivateKeyEncryptionType
@@ -156,6 +159,7 @@ function Get-DbaDatabaseEncryption {
                         KeyLength                = $ak.KeyLength
                         Owner                    = $ak.Owner
                         Object                   = $ak
+                        ExpirationDate           = $null
                     }
 
                 }
@@ -172,10 +176,10 @@ function Get-DbaDatabaseEncryption {
                         KeyLength                = $sk.KeyLength
                         Owner                    = $sk.Owner
                         Object                   = $sk
+                        ExpirationDate           = $null
                     }
                 }
             }
         }
     }
 }
-

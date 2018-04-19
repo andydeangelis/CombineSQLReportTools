@@ -23,8 +23,8 @@ function Remove-DbaDbUser {
     .PARAMETER User
     Specifies the list of users to remove.
 
-    .PARAMETER UserCollection
-    Internal parameter to support piping from Get-DbaDatabaseUser.
+    .PARAMETER InputObject
+    Support piping from Get-DbaDatabaseUser.
 
     .PARAMETER Force
     If enabled this will force the change of the owner to 'dbo' for any schema which owner is the User.
@@ -46,7 +46,7 @@ function Remove-DbaDbUser {
 
     Website: https://dbatools.io
     Copyright: (C) Chrissy LeMaire, clemaire@gmail.com
-    License: GNU GPL v3 https://opensource.org/licenses/GPL-3.0
+    License: MIT https://opensource.org/licenses/MIT
 
     .LINK
     https://dbatools.io/Remove-DbaDbUser
@@ -95,13 +95,14 @@ function Remove-DbaDbUser {
         [object[]]$User,
 
         [parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'Object')]
-        [Microsoft.SqlServer.Management.Smo.User[]]$UserCollection,
+        [Microsoft.SqlServer.Management.Smo.User[]]$InputObject,
 
         [parameter(ParameterSetName = 'User')]
         [parameter(ParameterSetName = 'Object')]
         [switch]$Force,
 
-        [switch][Alias('Silent')]$EnableException
+        [Alias('Silent')]
+        [switch]$EnableException
     )
 
     begin {
@@ -204,8 +205,8 @@ function Remove-DbaDbUser {
     }
 
     process {
-        if ($UserCollection) {
-            Remove-DbUser $UserCollection
+        if ($InputObject) {
+            Remove-DbUser $InputObject
         }
         else {
             foreach ($instance in $SqlInstance) {
@@ -228,7 +229,7 @@ function Remove-DbaDbUser {
 
                 foreach ($db in $databases) {
                     Write-Message -Level Verbose -Message "Get users in Database $db on target $server"
-                    $users = Get-DbaDatabaseUser -SqlInstance $instance -SqlCredential $SqlCredential -Database $db.Name
+                    $users = Get-DbaDatabaseUser -SqlInstance $server -Database $db.Name
                     $users = $users | Where-Object Name -In $User
                     Remove-DbUser $users
                 }
