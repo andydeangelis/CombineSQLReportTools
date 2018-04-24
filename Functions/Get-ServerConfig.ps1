@@ -24,10 +24,6 @@
 # Only works for Windows.
 # At some point, add support to query for Linux as well.
 
-$dbatools = "C:\Scripts\CombineSQLReportTools\Modules\dbatools\dbatools.psm1"
-
-# Import-Module -Name "C:\Scripts\CombineSQLReportTools\Modules\PoshRSJob\PoshRSJob.psm1" -Scope Local -PassThru
-
 function Get-ServerConfig
 {
 
@@ -40,7 +36,7 @@ function Get-ServerConfig
   # Let's get some data. For each server in the $ComputerNames array. get target computer system information and add it to the array.
   # Since we are using the PoshRSJobs module, we will create the script blobk below.
 
-  $scriptBlock = {
+  $getSvrConfigScript = {
 
         Param ($server,$parent)
 
@@ -65,7 +61,7 @@ function Get-ServerConfig
               {
                 
                 $ServerConfigObject = Get-DbaComputerSystem -ComputerName $server
-                $ServerOSObject = Get-DbaOperatingSystem -ComputerName $server
+                $ServerOSObject = Get-DbaOperatingSystem -ComputerName $server                
             
                 $ServerConfigObject | Add-Member -MemberType NoteProperty -Name TotalVisibleMemory -Value $ServerOSObject.TotalVisibleMemory
                 $ServerConfigObject | Add-Member -MemberType NoteProperty -Name FreePhysicalMemory -Value $ServerOSObject.FreePhysicalMemory
@@ -94,7 +90,7 @@ function Get-ServerConfig
                 $ServerConfigObject.PSObject.Properties.Remove('TotalPhysicalMemory')
             
                 # $Using:ServerConfigResult += $ServerConfigObject
-                
+
                 $ServerConfigObject  
                 
               }
@@ -111,55 +107,112 @@ function Get-ServerConfig
        
     }
 
-    $parent = Split-Path -Path $PSScriptRoot -Parent    
+  $getDiskConfigScript = {
+
+        Param ($server,$parent)
+
+        Import-module "$parent\Modules\dbatools\dbatools.psm1"
+
+        if ($server -ne $null)
+        {
+            if (Test-Connection $server -Count 2 -Quiet)
+            {
+              # Server is responding to ping, but let's make sure it's a Windows machine.              
+      
+              try
+              {
+                $isWindows = (Get-WmiObject Win32_OperatingSystem -ComputerName $server -erroraction 'silentlycontinue').Name         
+              }
+              catch
+              {
+                Write-Host "Unable to connect to $server. Is this a Windows OS?" -ForegroundColor Red
+              }
+              if ($isWindows)
+              {
+                
+                $ServerDiskConfigObject = Get-DbaDiskSpace -ComputerName $server
+                
+                $ServerDiskConfigObject  
+                
+              }
+            }
+            else
+            {
+              Write-Host "Server $server can not be contacted." -foregroundcolor Red
+            }
+        }
+        else
+        {
+            Write-Host "Server name is null."
+        }
+       
+    }
+
+  $parent = Split-Path -Path $PSScriptRoot -Parent    
   
   # For each server, start a separate runspace job.
 
   $Throttle = 8
-  $initialSessionState =[System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
-  $RunspacePool = [RunspaceFactory]::CreateRunspacePool(1,$Throttle,$initialSessionState,$Host)
-  $RunspacePool.Open()
-  $Jobs = @()
+  $svrConfigInitialSessionState =[System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+  $svrConfigRunspacePool = [RunspaceFactory]::CreateRunspacePool(1,$Throttle,$svrConfigInitialSessionState,$Host)
+  $svrConfigRunspacePool.Open()
+  $svrConfigJobs = @()
 
   foreach ($server in $ComputerName)
   {
-    $Job = [powershell]::Create().AddScript($ScriptBlock).AddArgument($server).AddArgument($parent)
-    $Job.RunspacePool = $RunspacePool
-    $Jobs += New-Object PSObject -Property @{
-      Pipe = $Job
-      Result = $Job.BeginInvoke()
+    $svrConfigJob = [powershell]::Create().AddScript($getSvrConfigScript).AddArgument($server).AddArgument($parent)
+    $svrConfigJob.RunspacePool = $svrConfigRunspacePool
+    $svrConfigJobs += New-Object PSObject -Property @{
+      Pipe = $svrConfigJob
+      Result = $svrConfigJob.BeginInvoke()
+    } 
+  }
+
+  $svrDiskConfiginitialSessionState =[System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+  $svrDiskConfigRunspacePool = [RunspaceFactory]::CreateRunspacePool(1,$Throttle,$svrDiskConfigInitialSessionState,$Host)
+  $svrDiskConfigRunspacePool.Open()
+  $svrDiskConfigJobs = @()
+
+  foreach ($server in $ComputerName)
+  {
+    $svrDiskConfigJob = [powershell]::Create().AddScript($getDiskConfigScript).AddArgument($server).AddArgument($parent)
+    $svrDiskConfigJob.RunspacePool = $svrDiskConfigRunspacePool
+    $svrDiskConfigJobs += New-Object PSObject -Property @{
+      Pipe = $svrDiskConfigJob
+      Result = $svrDiskConfigJob.BeginInvoke()
     } 
   }
   
-  $results = @()
+  $svrConfigResults = @()
+  $svrDiskConfigResults = @()
 
-  $counter = 0
+  Write-Host "Getting server configuration..." -NoNewline -ForegroundColor Green
 
   Do
   {
-    # Write-Host "." -NoNewline
-    # Start-Sleep -Seconds 1
-    
-    foreach ($server in $ComputerName) 
-    {
-        $counter++
-        Write-Progress -Activity 'Processing computers' -CurrentOperation $server -PercentComplete (($counter / $ComputerName.count) * 100)
-        Start-Sleep -Milliseconds 200
-    }
-  } while ($Jobs.Result.IsCompleted -contains $false)
-    
-  Write-Host "All jobs completed!"
+    Write-Host "." -NoNewline -ForegroundColor Green
+    Start-Sleep -Milliseconds 200
+  } while (($svrConfigJobs.Result.IsCompleted -contains $false) -or ($svrDiskConfigJobs.Result.IsCompleted -contains $false))
 
-  
-  ForEach ($Job in $Jobs) 
+  ForEach ($svrConfigJob in $svrConfigJobs) 
   {       
-    $Results += $Job.Pipe.EndInvoke($Job.Result)
+    $svrConfigResults += $svrConfigJob.Pipe.EndInvoke($svrConfigJob.Result)
   }
 
+  ForEach ($svrDiskConfigJob in $svrDiskConfigJobs) 
+  {       
+    $svrDiskConfigResults += $svrDiskConfigJob.Pipe.EndInvoke($svrDiskConfigJob.Result)
+  }
+
+  Write-Host "All jobs completed!" -ForegroundColor Green
+
 # $Results | Out-GridView
-  $RunspacePool.Close()
-  $RunspacePool.Dispose()
+  $svrConfigRunspacePool.Close()
+  $svrConfigRunspacePool.Dispose()
+
+  $svrDiskConfigRunspacePool.Close()
+  $svrDiskConfigRunspacePool.Dispose()
  
-  return $results
+  return $svrConfigResults,$svrDiskConfigResults
   
 }

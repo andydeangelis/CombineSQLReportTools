@@ -23,12 +23,19 @@
 
 function Get-ClusterConfig
 {
-    # This is the -ClusterNamez parameter passed from the PS_SQL_DB_Info.ps1 script, hence the 'ValueFromPipeline' definition.
+    # This is the -ClusterName parameter passed from the PS_SQL_DB_Info.ps1 script, hence the 'ValueFromPipeline' definition.
     Param(
-        [parameter(Mandatory=$true,ValueFromPipeline=$True)] $ClusterName
+        [parameter(Mandatory=$true,ValueFromPipeline=$True)] $ClusterNames
     )
 
+    $parent = Split-Path -Path $PSScriptRoot -Parent
 
+    $getClConfigScript = {
+
+        Param ($ClusterName,$parent)
+
+        Import-module "$parent\Modules\dbatools\dbatools.psm1"
+        
         # Let's get some cluster data from WMI. The first variable pulls the running cluster config.
         
         $clData = Get-WmiObject -Namespace root\mscluster -ComputerName $ClusterName -Class mscluster_cluster
@@ -65,6 +72,51 @@ function Get-ClusterConfig
         
         # Return the core cluster config as an object.
 
-        return $clObject
+        $clObject
+        
+       
+    }
+
+    # For each server, start a separate runspace job.
+
+  $Throttle = 8
+  $clConfigInitialSessionState =[System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+  $clConfigRunspacePool = [RunspaceFactory]::CreateRunspacePool(1,$Throttle,$clConfigInitialSessionState,$Host)
+  $clConfigRunspacePool.Open()
+  $clConfigJobs = @()
+
+  foreach ($cluster in $ClusterNames)
+  {
+    $clConfigJob = [powershell]::Create().AddScript($getClConfigScript).AddArgument($cluster).AddArgument($parent)
+    $clConfigJob.RunspacePool = $clConfigRunspacePool
+    $clConfigJobs += New-Object PSObject -Property @{
+      Pipe = $clConfigJob
+      Result = $clConfigJob.BeginInvoke()
+    } 
+  }
+
+  $clConfigResults = @()  
+
+  Write-Host "Getting cluster configuration..." -NoNewline -ForegroundColor Green
+
+  Do
+  {
+    Write-Host "." -NoNewline -ForegroundColor Green
+    Start-Sleep -Milliseconds 200
+  } while ($clConfigJobs.Result.IsCompleted -contains $false)
+
+  ForEach ($clConfigJob in $clConfigJobs) 
+  {       
+    $clConfigResults += $clConfigJob.Pipe.EndInvoke($clConfigJob.Result)
+  }
+
+  Write-Host "All jobs completed!" -ForegroundColor Green
+
+# $Results | Out-GridView
+  $clConfigRunspacePool.Close()
+  $clConfigRunspacePool.Dispose()
+
+  return $clConfigResults
+        
         
 }
