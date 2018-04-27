@@ -62,6 +62,8 @@
   $clSQLRunspacePool.Open()
   $clSQLJobs = @()
 
+  Write-Host "Getting clustered SQL configuration..." -NoNewline -ForegroundColor Green
+
   foreach ($cluster in $ClusterNames)
   {
     $testClusteredSQLInstance = (Get-WmiObject -Namespace root\mscluster -Class MSCluster_Resource -ComputerName $cluster | Where-Object {$_.Type -eq 'SQL Server'})
@@ -88,9 +90,7 @@
   }
   
   $clSQLResults = @()  
-
-  Write-Host "Getting clustered SQL configuration..." -NoNewline -ForegroundColor Green
-
+  
   Do
   {
     Write-Host "." -NoNewline -ForegroundColor Green

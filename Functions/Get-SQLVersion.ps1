@@ -2,7 +2,7 @@
 #
 #
 #
-#    Script: Get-SQLConfig function
+#    Script: Get-SQLVersion function
 #    Author: Andy DeAngelis
 #    Descrfiption: 
 #         Returns the running configuration of a SQL Instance.
@@ -11,14 +11,14 @@
 #           - This script also uses dbatools PowerShell module.
 #
 #    Examples:
-#               . .\Get-SQLConfig.ps1
+#               . .\Get-SQLVersion.ps1
 #
-#               Get-SQLConfig -instanceName SERVER\Instance
+#               Get-SQLVersion -instanceName SERVER\Instance -SQLCredential (Get-Credential)
 #
 #````Note: Powershellv3 or higher is needed.
 #######################################################################################################################################
 
-function Get-SQLConfig
+function Get-SQLVersion
 {
 
   # This is the -instance.Name parameter passed from the PS_SQL_DB_Info.ps1 script, hence the 'ValueFromPipeline' definition.
@@ -38,7 +38,7 @@ function Get-SQLConfig
         
       try
         {
-            $testDBAConnectionDomain = Test-DbaConnection -sqlinstance $instance
+            $testDBAConnectionDomain = Test-DbaConnection -sqlinstance $instance 
         }
         catch
         {
@@ -59,11 +59,36 @@ function Get-SQLConfig
           
         if (($testDBAConnectionDomain -and $testDBAConnectionSQL) -or ($testDBAConnectionDomain -and !($testDBAConnectionSQL)))
         {
-            $sqlConfig = Get-DbaSpConfigure -SqlInstance $instance
+            # If the connection to the SQL instance is successful, call the Get-SQLData function.       
+            # Get-SqlData -instanceName $instance -Path $clSQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery
+          
+            $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
+                
+            $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+            
+            # Add the SQL configuration to the global variable.
+            #$sqlConfig = Get-DbaSpConfigure -SqlInstance $instance
+            # $sqlVersionConfig += $config
+            
+            
         }
         elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
         {
-            $sqlConfig = Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
+            # If the connection to the SQL instance is successful, call the Get-SQLData function.       
+            # Get-SqlData -instanceName $instance -Path $clSQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery -Credential $sqlCred
+          
+            $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
+            $edition.ConnectionContext.LoginSecure=$false
+            $edition.ConnectionContext.set_Login($sqlCred.UserName)
+            $edition.ConnectionContext.set_SecurePassword($sqlCred.Password)
+                
+            $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
+              
+            # Add the SQL configuration to the global variable.
+            # $sqlConfig = Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
+            # $sqlVersionConfig += $config
+            
+           
         }        
         else
         {
@@ -73,7 +98,7 @@ function Get-SQLConfig
             # $testConnectMsg | Out-File -FilePath $failedConnections -Append
         }
 
-        $sqlConfig
+        $config
     } # End script block
 
   
@@ -93,7 +118,7 @@ function Get-SQLConfig
     } 
   }
 
-  Write-Host "Getting SQL sp_configure output..." -NoNewline -ForegroundColor Green
+  Write-Host "Getting SQL Version output..." -NoNewline -ForegroundColor Green
 
   Do
   {
@@ -101,11 +126,11 @@ function Get-SQLConfig
     Start-Sleep -Milliseconds 200
   } while ($sqlConfigJobs.Result.IsCompleted -contains $false)
 
-  $sqlSPConfig = @()
+  $sqlConfig = @()
 
   ForEach ($sqlConfigJob in $sqlConfigJobs) 
   {     
-    $sqlSPConfig += $sqlConfigJob.Pipe.EndInvoke($sqlConfigJob.Result)
+    $sqlConfig += $sqlConfigJob.Pipe.EndInvoke($sqlConfigJob.Result)
   }
 
   Write-Host "All jobs completed!" -ForegroundColor Green
@@ -113,6 +138,6 @@ function Get-SQLConfig
   $sqlConfigRunspacePool.Close()
   $sqlConfigRunspacePool.Dispose()
 
-  return $sqlSPConfig  
+  return $sqlConfig  
   
 }

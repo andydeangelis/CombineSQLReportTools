@@ -60,8 +60,8 @@ function Get-ServerConfig
               if ($isWindows)
               {
                 
-                $ServerConfigObject = Get-DbaComputerSystem -ComputerName $server
-                $ServerOSObject = Get-DbaOperatingSystem -ComputerName $server                
+                $ServerConfigObject = Get-DbaComputerSystem -ComputerName $server -WarningAction SilentlyContinue
+                $ServerOSObject = Get-DbaOperatingSystem -ComputerName $server -WarningAction SilentlyContinue                
             
                 $ServerConfigObject | Add-Member -MemberType NoteProperty -Name TotalVisibleMemory -Value $ServerOSObject.TotalVisibleMemory
                 $ServerConfigObject | Add-Member -MemberType NoteProperty -Name FreePhysicalMemory -Value $ServerOSObject.FreePhysicalMemory

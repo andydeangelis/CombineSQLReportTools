@@ -83,6 +83,9 @@ else
     $targetPath = "$PSScriptRoot\SQLServerInfo\$datetime"
 }
 
+# Let's start our stopwatch.
+$stopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+
 $failedConnections = "$targetPath\FailedConnections-$datetime.txt"
 $logFile = "$targetPath\DebugLogFile-$datetime.txt"
 
@@ -99,9 +102,7 @@ if (!(Test-Path $logFile))
 Write-Host "Server Config will be written to $ServerConfigxlsxReportPath" -ForegroundColor DarkGreen
 
 # Create a new, empty Excel document for SQL Data.
-$SQLDataxlsxReportPath =  "$targetPath\StandaloneSQLServerDBReport-$datetime.xlsx"
-$clSQLDataxlsxReportPath =  "$targetPath\ClusteredSQLServerDBReport-$datetime.xlsx"
-$agSQLDataxlsxReportPath =  "$targetPath\AvailabilityGroupSQLServerDBReport-$datetime.xlsx"
+$SQLDataxlsxReportPath =  "$targetPath\SQLServerDBReport-$datetime.xlsx"
 
 # Create a new, empty Excel document for Cluster Configuration.
 $clClusterConfigxlsxReportPath =  "$targetPath\ClusterConfigReport-$datetime.xlsx"
@@ -132,13 +133,28 @@ Start-Transcript -Path $logFile
 # Create an array for job names.
 $jobNames = @()
 
-# Let's start by getting the server config for each of the servers. This will be for all servers, clustered or not.
+# Let's verify which servers are online and which are not.
 
 if ($Servers -ne $null)
 {
+    $aliveServers = Get-IsAlive -ComputerNames $Servers
+}
+
+# Now, we use the Compare-Object cmdlet to get the list of servers that didn't respond to the Get-IsAlive function.
+
+$deadServers = Compare-Object -ReferenceObject $aliveServers -DifferenceObject $Servers -PassThru
+
+# Let's output the list of dead servers to the failed connection log.
+
+$deadServers | Out-File -FilePath $failedConnections
+
+# Let's start by getting the server config for each of the servers. This will be for all servers, clustered or not.
+
+if ($aliveServers -ne $null)
+{
   # First, we'll get the server data returned as an array.
 
-  $ServerConfigResult = Get-ServerConfig -ComputerName $Servers
+  $ServerConfigResult = Get-ServerConfig -ComputerName $aliveServers
 
   # Set the worksheet names. 
   
@@ -154,8 +170,7 @@ if ($Servers -ne $null)
     
   if ($ServerConfigResult -ne $null)
   {
-    Write-Host "Creating excel document..." -ForegroundColor Yellow
-
+    Write-Host "Creating server config spreadsheet..." -ForegroundColor Yellow
     # Create a new, empty Excel document for Stand-alone Server Configuration.
     $ServerConfigxlsxReportPath =  "$targetPath\ServerConfigReport-$datetime.xlsx"
     
@@ -178,7 +193,7 @@ else
 
 # Determine which servers are part of a cluster and which are not.
 
-foreach ($server in $Servers)
+foreach ($server in $aliveServers)
 {
   # Let's use WMI to see if the server is part of a cluster.
   
@@ -205,7 +220,7 @@ foreach ($server in $Servers)
 if ($ClusterNames -ne $null)
 {
   # Strip out duplicate cluster names.
-
+  
   $clNames = $ClusterNames | Select -Unique
 
   # Instantiate an array to hold the core cluster configurations.
@@ -245,7 +260,7 @@ if ($ClusterNames -ne $null)
     }
   } 
 
-  # Set the worksheet name. We will have a single tab that will hold each cluster's config for easy reference..
+    # Set the worksheet name. We will have a single tab that will hold each cluster's config for easy reference..
   
     $clConfigWorksheet = "Cluster Configs"
 
@@ -263,6 +278,9 @@ if ($ClusterNames -ne $null)
         Write-Host "No cluster data found."
     }
 }
+
+# We now need to get all the SQL instance names, however, retrieving them from clusters is a bit different than stand-alone servers.
+# Since we have separated cluster servers and non cluster servers, we can get two separate lists of instances, clustered and not.
   
 # Call the Get-ClusterSQLInstances function to get the list of SQL instance names on cluster nodes.
 # This will return both failover cluster node instances, as well as stand-alone instances on servers that are part of an Always On Availability Group.
@@ -272,214 +290,59 @@ if ($clNames -ne $null)
     $clSQLInstances = Get-ClusteredSQLInstances -ClusterNames $clNames
 }
 
-# Now that we've retrieved all the instances on clustered nodes, let's determine if they are clustered instances or stand-alone (i.e. used for Always On Availability Groups).
+# Now, let's get the list of stand-alone instance names.
 
-foreach($instance in $clSQLInstances)
+if ($ServerNames -ne $null)
 {
-    # Test the connection to the SQL instance.
-    # First we will try to connect to the instance using the domain credentials, then, if specified, we'll use the SQL credentials.
-
-    try
-    {
-        $testDBAConnectionDomain = Test-DbaConnection -sqlinstance $instance
-    }
-    catch
-    {
-        "No connection could be made using Domain credentials."
-    }
-              
-    try
-    {
-        $testDBAConnectionSQL = Test-DbaConnection -sqlinstance $instance -SQLCredential $sqlCred
-    }
-    catch
-    {
-        "No connection could be made using SQL credentials."
-    }
-          
-    if (($testDBAConnectionDomain -and $testDBAConnectionSQL) -or ($testDBAConnectionDomain -and !($testDBAConnectionSQL)))
-    {
-        # If the connection to the SQL instance is successful, call the Get-SQLData function.       
-        Get-SqlData -instanceName $instance -Path $clSQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery
-          
-        $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
-                
-        $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
-        $bpTest = Test-SQLBP -instanceName $instance -ComputerName $clName -IsClustered $true
-              
-        # Add the SQL configuration to the global variable.
-        $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance
-        $sqlVersionConfig += $config
-        $sqlBP += $bptest
-
-        if (Get-DbaAvailabilityGroup -SqlInstance $instance)
-        {
-            $agConfigResult += Get-DbaAvailabilityGroup -SqlInstance $instance | select Name,ComputerName,InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
-                                                                                            PrimaryReplica,AutomatedBackupPreference,BasicAvailabilityGroup,FailureConditionLevel,
-                                                                                            HealthCheckTimeout,ID,IsDistributedAvailabilityGroup,LocalReplicaRole,PrimaryReplicaServerName,
-                                                                                            AvailabilityGroupListeners,State                
-        }
-    }
-    elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
-    {
-        # If the connection to the SQL instance is successful, call the Get-SQLData function.       
-        Get-SqlData -instanceName $instance -Path $clSQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery -Credential $sqlCred
-          
-        $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
-        $edition.ConnectionContext.LoginSecure=$false
-        $edition.ConnectionContext.set_Login($sqlCred.UserName)
-        $edition.ConnectionContext.set_SecurePassword($sqlCred.Password)
-                
-        $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
-        $bpTest = Test-SQLBP -instanceName $instance -ComputerName $clName -Credential $sqlCred -IsClustered $true
-              
-        # Add the SQL configuration to the global variable.
-        $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
-        $sqlVersionConfig += $config
-        $sqlBP += $bpTest
-
-        if (Get-DbaAvailabilityGroup -SqlInstance $instance -Credential $sqlCred)
-        {
-            $agConfigResult += Get-DbaAvailabilityGroup -SqlInstance $instance -SQLCredential $sqlCred | select Name,ComputerName,InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
-                                                                                            PrimaryReplica,AutomatedBackupPreference,BasicAvailabilityGroup,FailureConditionLevel,
-                                                                                            HealthCheckTimeout,ID,IsDistributedAvailabilityGroup,LocalReplicaRole,PrimaryReplicaServerName,
-                                                                                            AvailabilityGroupListeners,State                
-        }
-    }        
-    else
-    {
-        $errorDateTime = get-date -f MM-dd-yyyy_hh.mm.ss
-        $testConnectMsg = "<$errorDateTime> - No connection could be made to " + $instance + ". Authentication or network issue?"
-        Write-host $testConnectMsg -foregroundcolor "magenta"
-        $testConnectMsg | Out-File -FilePath $failedConnections -Append
-    }
-
+    $SQLInstances = Get-SQLInstances02 -ComputerNames $ServerNames
 }
 
-# Now that we have all the clusters out of the way, get SQL information for stand-alone servers only.
+# Finally, we will combine both lists into a single array.
 
-foreach ($server in $ServerNames)
+if (($clSQLInstances -ne $null) -and ($SQLInstances -ne $null))
 {
-    # Ping the server to see if it is online.
-    if (Test-Connection $server -Count 2 -Quiet)
-      {   
-        # Determine if server is part of a cluster.
+    $allSQLInstances = $clSQLInstances + $SQLInstances
+}
+elseif (($clSQLInstances -eq $null) -and ($SQLInstances -ne $null))
+{
+    $allSQLInstances = $SQLInstances
+}
+elseif (($clSQLInstances -ne $null) -and ($SQLInstances -eq $null))
+{
+    $allSQLInstances = $clSQLInstances
+}
+else
+{
+    Write-Host "No SQL instances found..." -ForegroundColor Red
+}
 
-        # Since the server is online and not clustered, get the SQL instances, if they exist.
-        
-        $SQLInstances = Get-SQLInstances02 -ComputerName $server
-        
-        # Server replies to ping, but check to ensure the SQL instances were returned.
-        # If no instances are returned, write an error message to the log file.
+# Now that we've retrieved all the SQL instances, let's get some info...
 
-        if (!$SQLInstances) 
-        { 
-            $errorDateTime3 = get-date -f MM-dd-yyyy_hh.mm.ss
-            $noSQLMsg = "<$errorDateTime3> - Server $server is online, but no SQL instances could be retrieved. Do you have access to the server, and is SQL installed?"
-            Write-Host "No SQL Instances found on server $server." -ForegroundColor Red
-            $noSQLMsg | Out-File -FilePath $failedConnections -Append
-        }
-        else
-        {
-            # Server is online and has SQL instances. Iterate through each instance.
-            
-            foreach($instance in $SQLInstances)
-            {
-              # Test the connection to the SQL instance.
-              # First we will try to connect to the instance using the domain credentials, then, if specified, we'll use the SQL credentials.
-
-              try
-              {
-                  $testDBAConnectionDomain = Test-DbaConnection -sqlinstance $instance
-              }
-              catch
-              {
-                "No connection could be made using Domain credentials."
-              }
-              
-              try
-              {
-                 $testDBAConnectionSQL = Test-DbaConnection -sqlinstance $instance -SQLCredential $sqlCred
-              }
-              catch
-              {
-                "No connection could be made using SQL credentials."
-              }
-                            
-              # If domain credential connections are successful, use domain credentials, regardless if SQL creds are specified or successful.
-            
-              if (($testDBAConnectionDomain -and $testDBAConnectionSQL) -or ($testDBAConnectionDomain -and !($testDBAConnectionSQL)))
-              {
-                # If the connection to the SQL instance is successful, call the Get-SQLData function.       
-                Get-SqlData -instanceName $instance -Path $SQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery
-                
-                $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
-                
-                $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
-                
-                $bpTest = Test-SQLBP -instanceName $instance -ComputerName $server                
-              
-                # Add the SQL configuration to the global variable.
-                $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance
-                $sqlVersionConfig += $config
-                $sqlBP += $bpTest
-              }
-              elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
-              {
-                # If the connection to the SQL instance is successful, call the Get-SQLData function.       
-                Get-SqlData -instanceName $instance -Path $SQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery -Credential $sqlCred
-                
-                $edition = new-object ('Microsoft.SqlServer.Management.Smo.Server') $instance
-                $edition.ConnectionContext.LoginSecure=$false
-                $edition.ConnectionContext.set_Login($sqlCred.UserName)
-                $edition.ConnectionContext.set_SecurePassword($sqlCred.Password)
-                
-                $config = $edition | select Name, Edition, BuildNumber, Product, ProductLevel, Version, IsClustered, Processors, PhysicalMemory, DefaultFile, DefaultLog,  MasterDBPath, MasterDBLogPath, BackupDirectory, ServiceAccount, InstanceName
-                
-                $bpTest = Test-SQLBP -instanceName $instance -ComputerName $server -Credential $sqlCred
-              
-                # Add the SQL configuration to the global variable.
-                $sqlConfig += Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
-                $sqlVersionConfig += $config
-                $sqlBP += $bpTest
-              }
-              else
-              {
-                  $errorDateTime1 = get-date -f MM-dd-yyyy_hh.mm.ss
-                  $testConnectMsg = "<$errorDateTime1> - No connection could be made to $instance . Authentication or network issue?"
-                  Write-host $testConnectMsg -foregroundcolor "magenta"
-                  $testConnectMsg | Out-File -FilePath $failedConnections -Append
-              }
-
-            }
-        }
-        
-      }
-      else
-      {
-        $errorDateTime2 = get-date -f MM-dd-yyyy_hh.mm.ss
-        $errorMsg = "<$errorDateTime2> - No connection to $server could be made." 
-        Write-host $errorMsg -foregroundcolor "magenta"
-        $errorMsg | Out-File -FilePath $failedConnections -Append                
+if ($allSQLInstances -ne $null)
+{
+    $sqlConfig += Get-SQLConfig -instanceNames $allSQLInstances -SQLCredential $sqlCred
+    $sqlVersionConfig += Get-SQLVersion -InstanceNames $allSQLInstances -SQLCredential $sqlCred
+    $agConfigResult += Get-SQLAGConfig -InstanceNames $allSQLInstances -SQLCredential $sqlCred
+    foreach ($instance in $allSQLInstances)
+    {
+        Get-SQLData -InstanceName $instance -Path $SQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery -Credential $sqlCred
     }
-
 }
 
 # Let's output the Always On AG config to a spreadsheet.
 
 if ($agConfigResult -ne $null)
 {
-    foreach ($item in $agConfigResult)
+    $agNames = $agConfigResult | Select -Unique Name
+    
+    foreach ($ag in $agNames)
     {
-        # However, to avoid duplicates, let's go ahead and only write out the results that are listed as a Primary replica.
-          
-        if ($item.LocalReplicaRole -eq "Primary")
-        {
-            $agWorksheet = $item.AvailabilityGroup + "$" + $item.ComputerName
-            $agTableName = $item.AvailabilityGroup + "-" + $item.ComputerName
-            $excel = $agConfigResult | Export-Excel -Path $agConfigxlsxReportPath -AutoSize -WorksheetName $agWorksheet -FreezeTopRow -TableName $agTableName -PassThru
-            $excel.Save() ; $excel.Dispose()
-        }
+        $agsUnique = $agConfigResult | ?{$_.Name -eq $ag.Name}
+        $agWorksheet = "AG - " + $ag.Name
+        $agTableName = "AG-" + $ag.Name
+        $excel = $agsUnique | Export-Excel -Path $agConfigxlsxReportPath -AutoSize -WorksheetName $agWorksheet -FreezeTopRow -TableName $agTableName -PassThru
+        $excel.Save() ; $excel.Dispose()
+        
     }
 }
 else
@@ -502,7 +365,7 @@ $sqlBPTable = "SQLBestPractices"
 
 $sqlConfigSpreadsheet =  "$targetPath\sqlConfig-$datetime.xlsx"
 
-if (($sqlConfig -ne $null) -and ($sqlBP -ne $null))
+if ($sqlConfig -ne $null)
 {
   $excel2 = $sqlVersionConfig | Export-Excel -Path $sqlConfigSpreadsheet -Autosize -Worksheet $sqlVersionConfigWorksheet -FreezeTopRow -TableStyle 'Medium6' -TableName $sqlVersionConfigTable -PassThru
   $excel2.Save() ; $excel2.Dispose()
@@ -516,7 +379,30 @@ else
   Write-Host "No SQL Data to export." -ForegroundColor Red
 }
 
-$sqlBP | Out-File -FilePath "$targetPath\BestPractice.txt"
+# $sqlBP | Out-File -FilePath "$targetPath\BestPractice.txt"
+
+Write-Host "The total number of servers checked is:" -ForegroundColor Cyan -NoNewline
+Write-Host "$($Servers.Count)" -ForegroundColor Yellow
+Write-Host "The number of alive servers is:" -ForegroundColor Cyan -NoNewline
+Write-Host "$($aliveServers.Count)" -ForegroundColor Yellow
+Write-Host "The number of clusters is:" -ForegroundColor Cyan -NoNewline
+Write-Host "$($clNames.Count)" -ForegroundColor Yellow
+Write-Host "The number of SQL instances is:" -ForegroundColor Cyan -NoNewline
+Write-Host "$($allSQLInstances.Count)" -ForegroundColor Yellow
+Write-Host "The number of SQL AlwaysOn Availability Groups is:" -ForegroundColor Cyan -NoNewline
+Write-Host "$($agNames.Count)" -ForegroundColor Yellow
+
+$stopWatch.Stop()
+
+Write-Host "Total script run time (ms): " -ForegroundColor Cyan -NoNewline
+Write-Host "$($stopWatch.Elapsed.TotalMilliseconds)" -ForegroundColor Yellow
+
+Write-Host "Total script run time (sec): " -ForegroundColor Cyan -NoNewline
+Write-Host "$($stopWatch.Elapsed.TotalSeconds)" -ForegroundColor Yellow
+
+Write-Host "Total script run time (min): " -ForegroundColor Cyan -NoNewline
+Write-Host "$($stopWatch.Elapsed.TotalMinutes)" -ForegroundColor Yellow
+
 Read-Host -Prompt "Press any key to continue"
 Stop-Transcript
 

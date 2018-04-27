@@ -30,12 +30,11 @@ function Get-SQLInstances02
     $instanceNames = @()
     $getSQLInstanceScript = {
 
-        Param($server,$parent)
+           Param($server,$parent)
 
-        $instances = @()
+           $instances = @()
 
-        if(Test-Connection $server -Count 2 -Quiet)
-        {
+        
           # We need to get the correct Namespace name to query, as it changes per version of SQL Serever.
           # For example, SQL 2014 is ROOT\Microsoft\SqlServer\ComputerManagement12 where SQL 2016 is ROOT\Microsoft\SqlServer\ComputerManagement13.
           # Wildcards are not allowed in the Namespace parameter of the Get-WMIObject cmdlet.
@@ -48,10 +47,10 @@ function Get-SQLInstances02
           catch
           {
             Write-Host "No SQL instances found in WMI." -ForegroundColor Cyan
-          }
-        }
+          }       
      
           # Iterate through each SQL instance on the target server and return the object back to the main script.
+
 
           foreach ($instance in $instanceArray)
           {
@@ -78,14 +77,11 @@ function Get-SQLInstances02
           }
 
           $instances
+
         } # End Script block
      
       $Throttle = 8
       $SQLInitialSessionState =[System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
-
-      $definition = Get-Content Function:\Get-SQLInstances02 -ErrorAction Stop   
-      $GetSQLInstancesSessionStateFunction = New-Object System.Management.Automation.Runspaces.SessionStateFunctionEntry -ArgumentList 'Get-SQLInstances02', $definition
-      $SQLInitialSessionState.Commands.Add($GetSQLInstancesSessionStateFunction)
 
       $SQLRunspacePool = [RunspaceFactory]::CreateRunspacePool(1,$Throttle,$SQLInitialSessionState,$Host)
       $SQLRunspacePool.Open()

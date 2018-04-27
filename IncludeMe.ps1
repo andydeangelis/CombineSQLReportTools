@@ -31,10 +31,13 @@ Import-Module -Name "$PSScriptRoot\Modules\ImportExcel\ImportExcel.psm1" -Scope 
 . "$PSScriptRoot\Functions\Get-SQLData.ps1"
 . "$PSScriptRoot\Functions\Get-SQLConfig.ps1"
 . "$PSScriptRoot\Functions\Test-SQLBP.ps1"
+. "$PSScriptRoot\Functions\Get-SQLVersion.ps1"
+. "$PSScriptRoot\Functions\Get-SQLAGConfig.ps1"
 
-# Souyrce the Get-ServerConfig function
+# Source the Get-ServerConfig function
 
 . "$PSScriptRoot\Functions\Get-ServerConfig.ps1"
+. "$PSScriptRoot\Functions\Get-IsAlive.ps1"
 
 # Include the MS Clustering functions.
 

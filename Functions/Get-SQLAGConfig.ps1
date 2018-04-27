@@ -2,7 +2,7 @@
 #
 #
 #
-#    Script: Get-SQLConfig function
+#    Script: Get-SQLAGConfig function
 #    Author: Andy DeAngelis
 #    Descrfiption: 
 #         Returns the running configuration of a SQL Instance.
@@ -11,14 +11,14 @@
 #           - This script also uses dbatools PowerShell module.
 #
 #    Examples:
-#               . .\Get-SQLConfig.ps1
+#               . .\Get-SQLVersion.ps1
 #
-#               Get-SQLConfig -instanceName SERVER\Instance
+#               Get-SQLVersion -instanceName SERVER\Instance -SQLCredential (Get-Credential)
 #
 #````Note: Powershellv3 or higher is needed.
 #######################################################################################################################################
 
-function Get-SQLConfig
+function Get-SQLAGConfig
 {
 
   # This is the -instance.Name parameter passed from the PS_SQL_DB_Info.ps1 script, hence the 'ValueFromPipeline' definition.
@@ -41,10 +41,9 @@ function Get-SQLConfig
             $testDBAConnectionDomain = Test-DbaConnection -sqlinstance $instance
         }
         catch
-        {
+        {            
             "No connection could be made using Domain credentials."
         }
-              
         if (!$testDBAConnectionDomain)
         {     
             try
@@ -59,11 +58,25 @@ function Get-SQLConfig
           
         if (($testDBAConnectionDomain -and $testDBAConnectionSQL) -or ($testDBAConnectionDomain -and !($testDBAConnectionSQL)))
         {
-            $sqlConfig = Get-DbaSpConfigure -SqlInstance $instance
+            if (Get-DbaAvailabilityGroup -SqlInstance $instance -WarningAction SilentlyContinue)
+            {
+                $agConfigResult += Get-DbaAvailabilityGroup -SqlInstance $instance | select Name,ComputerName,InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
+                                                                                                PrimaryReplica,AutomatedBackupPreference,BasicAvailabilityGroup,FailureConditionLevel,
+                                                                                                HealthCheckTimeout,ID,IsDistributedAvailabilityGroup,LocalReplicaRole,PrimaryReplicaServerName,
+                                                                                                AvailabilityGroupListeners,State                
+            }
         }
         elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
         {
-            $sqlConfig = Get-DbaSpConfigure -SqlInstance $instance -SQLCredential $sqlCred
+            $testAG = Get-DbaAvailabilityGroup -SqlInstance $instance -Credential $sqlCred -WarningAction SilentlyContinue
+
+            if ($testAG)
+            {
+                $agConfigResult += Get-DbaAvailabilityGroup -SqlInstance $instance -SQLCredential $sqlCred | select Name,ComputerName,InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
+                                                                                                PrimaryReplica,AutomatedBackupPreference,BasicAvailabilityGroup,FailureConditionLevel,
+                                                                                                HealthCheckTimeout,ID,IsDistributedAvailabilityGroup,LocalReplicaRole,PrimaryReplicaServerName,
+                                                                                                AvailabilityGroupListeners,State                
+            }
         }        
         else
         {
@@ -73,7 +86,7 @@ function Get-SQLConfig
             # $testConnectMsg | Out-File -FilePath $failedConnections -Append
         }
 
-        $sqlConfig
+        $agConfigResult
     } # End script block
 
   
@@ -93,7 +106,7 @@ function Get-SQLConfig
     } 
   }
 
-  Write-Host "Getting SQL sp_configure output..." -NoNewline -ForegroundColor Green
+  Write-Host "Getting Availability Group Configuration..." -NoNewline -ForegroundColor Green
 
   Do
   {
@@ -101,11 +114,11 @@ function Get-SQLConfig
     Start-Sleep -Milliseconds 200
   } while ($sqlConfigJobs.Result.IsCompleted -contains $false)
 
-  $sqlSPConfig = @()
+  $agsqlConfig = @()
 
   ForEach ($sqlConfigJob in $sqlConfigJobs) 
   {     
-    $sqlSPConfig += $sqlConfigJob.Pipe.EndInvoke($sqlConfigJob.Result)
+    $agsqlConfig += $sqlConfigJob.Pipe.EndInvoke($sqlConfigJob.Result)
   }
 
   Write-Host "All jobs completed!" -ForegroundColor Green
@@ -113,6 +126,6 @@ function Get-SQLConfig
   $sqlConfigRunspacePool.Close()
   $sqlConfigRunspacePool.Dispose()
 
-  return $sqlSPConfig  
+  return $agsqlConfig  
   
 }

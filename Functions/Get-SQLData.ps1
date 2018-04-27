@@ -24,7 +24,7 @@ function Get-SQLData
 
   # This is the -instance.Name parameter passed from the PS_SQL_DB_Info.ps1 script, hence the 'ValueFromPipeline' definition.
   Param(
-      [parameter(Mandatory=$true,ValueFromPipeline=$True)] $instanceName,
+      [parameter(Mandatory=$true,ValueFromPipeline=$True)] $InstanceName,
       [parameter(Mandatory=$true,ValueFromPipeline=$True)] $Path,
       [parameter(Mandatory=$true,ValueFromPipeline=$True)] $SQLQueryFile,
       [parameter(Mandatory=$false,ValueFromPipeline=$True)] $Credential
@@ -33,16 +33,43 @@ function Get-SQLData
   # Create variable that we will populate with the resultant set of data from the SQL queries.
   
   write-host "Instance name is $instanceName" -ForegroundColor Green
+
+    try
+    {
+        $testDBAConnectionDomain = Test-DbaConnection -sqlinstance $InstanceName 
+    }
+    catch
+    {
+        "No connection could be made using Domain credentials."
+    }
+              
+    if (!$testDBAConnectionDomain)
+    {     
+        try
+        {
+            $testDBAConnectionSQL = Test-DbaConnection -sqlinstance $InstanceName -SQLCredential $sqlCred
+        }
+        catch
+        {
+            "No connection could be made using SQL credentials."
+        }
+    }
   
-  if ($Credential -ne $null)
+  if (($testDBAConnectionDomain -and $testDBAConnectionSQL) -or ($testDBAConnectionDomain -and !($testDBAConnectionSQL)))
   {
-    $SQLDataresult = invoke-sqlcmd2 -InputFile $SQLQueryFile -serverinstance $instanceName -database master -credential $Credential
+    $SQLDataresult = invoke-sqlcmd2 -InputFile $SQLQueryFile -serverinstance $InstanceName -database master 
+  }
+  elseif (!($testDBAConnectionDomain) -and $testDBAConnectionSQL)
+  {
+    $SQLDataresult = invoke-sqlcmd2 -InputFile $SQLQueryFile -serverinstance $InstanceName -database master -credential $Credential
   }
   else
   {
-    $SQLDataresult = invoke-sqlcmd2 -InputFile $SQLQueryFile -serverinstance $instanceName -database master
+    $errorDateTime = get-date -f MM-dd-yyyy_hh.mm.ss
+    $testConnectMsg = "<$errorDateTime> - No connection could be made to " + $instance + ". Authentication or network issue?"
+    Write-host $testConnectMsg -foregroundcolor "magenta"
+    # $testConnectMsg | Out-File -FilePath $failedConnections -Append
   }
-  
   
   #The following DbaTools function is erroring out. Will use the aboce T-SQL script for now until I figure out the issue.
   # $SQLDataresult = Get-DbaDatabase -SqlInstance $instanceName
@@ -50,7 +77,7 @@ function Get-SQLData
   
   # Set the worksheet name. We will have a single Excel file with one tab per Instance. Worksheet names will be labeled as SERVERNAME-INSTANCENAME.
   
-  $SQLDataWorksheetName = $instanceName -replace "\\","-"
+  $SQLDataWorksheetName = $InstanceName -replace "\\","-"
   
   # Set the table names for the worksheet.
   
