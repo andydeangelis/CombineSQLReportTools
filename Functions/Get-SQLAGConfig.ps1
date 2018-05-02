@@ -60,7 +60,7 @@ function Get-SQLAGConfig
         {
             if (Get-DbaAvailabilityGroup -SqlInstance $instance -WarningAction SilentlyContinue)
             {
-                $agConfigResult += Get-DbaAvailabilityGroup -SqlInstance $instance | select Name,ComputerName,InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
+                $agConfigResult += Get-DbaAvailabilityGroup -SqlInstance $instance | select ComputerName,Name, InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
                                                                                                 PrimaryReplica,AutomatedBackupPreference,BasicAvailabilityGroup,FailureConditionLevel,
                                                                                                 HealthCheckTimeout,ID,IsDistributedAvailabilityGroup,LocalReplicaRole,PrimaryReplicaServerName,
                                                                                                 AvailabilityGroupListeners,State                
@@ -72,7 +72,7 @@ function Get-SQLAGConfig
 
             if ($testAG)
             {
-                $agConfigResult += Get-DbaAvailabilityGroup -SqlInstance $instance -SQLCredential $sqlCred | select Name,ComputerName,InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
+                $agConfigResult += Get-DbaAvailabilityGroup -SqlInstance $instance -SQLCredential $sqlCred | select ComputerName, Name,InstanceName,SqlInstance,AvailabilityGroup,DatabaseEngineEdition,
                                                                                                 PrimaryReplica,AutomatedBackupPreference,BasicAvailabilityGroup,FailureConditionLevel,
                                                                                                 HealthCheckTimeout,ID,IsDistributedAvailabilityGroup,LocalReplicaRole,PrimaryReplicaServerName,
                                                                                                 AvailabilityGroupListeners,State                

@@ -108,30 +108,12 @@ $SQLDataxlsxReportPath =  "$targetPath\SQLServerDBReport-$datetime.xlsx"
 $clClusterConfigxlsxReportPath =  "$targetPath\ClusterConfigReport-$datetime.xlsx"
 $agConfigxlsxReportPath =  "$targetPath\AvailabilityGroupConfigReport-$datetime.xlsx"
 
-# Get all the server config information.
-
-# Set the array name that we will use to hold the cluster names.
-$ClusterNames = @()
-
-# Set the array name that we will use to hold the non-cluster server names.
-$ServerNames = @()
-
-# Set the array name that we will use to hold the SQL Server configuration data.
-$sqlConfig = @()
-$sqlVersionConfig = @()
-
-# Set the array name that we will use to hold the Availability Group Configuration.
-$agConfigResult =@()
-
 # Create an array that will hold the SQL best practices data.
 $sqlBP = @()
 
 # Output the PowerShell screen text as debug file.
 
 Start-Transcript -Path $logFile
-
-# Create an array for job names.
-$jobNames = @()
 
 # Let's verify which servers are online and which are not.
 
@@ -148,50 +130,13 @@ $deadServers = Compare-Object -ReferenceObject $aliveServers -DifferenceObject $
 
 $deadServers | Out-File -FilePath $failedConnections
 
-# Let's start by getting the server config for each of the servers. This will be for all servers, clustered or not.
-
-if ($aliveServers -ne $null)
-{
-  # First, we'll get the server data returned as an array.
-
-  $ServerConfigResult = Get-ServerConfig -ComputerName $aliveServers
-
-  # Set the worksheet names. 
-  
-  $ServerConfigWorksheet = "Server Config"
-  $ServerDiskConfigWorksheet = "Disk Config"
-      
-  # Set the table names for the worksheet.
-  
-  $ServerConfigTableName = "ServerConfig"
-  $ServerDiskConfigTableName = "DiskConfig"
-    
-  # TO-DO: Add some error handling here (i.e. check to ensure the arrays are not empty or null).
-    
-  if ($ServerConfigResult -ne $null)
-  {
-    Write-Host "Creating server config spreadsheet..." -ForegroundColor Yellow
-    # Create a new, empty Excel document for Stand-alone Server Configuration.
-    $ServerConfigxlsxReportPath =  "$targetPath\ServerConfigReport-$datetime.xlsx"
-    
-    $excel = $ServerConfigResult[0] | Export-Excel -Path $ServerConfigxlsxReportPath -AutoSize -WorksheetName $ServerConfigWorksheet -FreezeTopRow -TableName $ServerConfigTableName -PassThru
-    $excel.Save() ; $excel.Dispose()
-    $excel2 = $ServerConfigResult[1] | Export-Excel -Path $ServerConfigxlsxReportPath -AutoSize -WorksheetName $ServerDiskConfigWorksheet -FreezeTopRow -TableName $ServerDiskConfigTableName -PassThru
-    $excel2.Save() ; $excel2.Dispose()
-    # $ServerOS | Export-Excel -Path $Path -AutoSize -WorksheetName $ServerOSWorksheet -FreezeTopRow -TableName $ServerOSTableName
-
-  }
-  else
-  {
-    Write-Host "No server data found."
-  }
-}
-else
-{
-  Write-Host "There are no servers to check." -ForegroundColor DarkRed
-}
-
 # Determine which servers are part of a cluster and which are not.
+
+# Set the array name that we will use to hold the cluster names.
+$ClusterNames = @()
+
+# Set the array name that we will use to hold the non-cluster server names.
+$singleServerNames = @()
 
 foreach ($server in $aliveServers)
 {
@@ -211,7 +156,7 @@ foreach ($server in $aliveServers)
     # If the server is not part of a cluster, add the server name to the ServerNames array.
     # Note that this is an array of strings.
     Write-Host "Server $server is NOT clustered. Checking server config..." -ForegroundColor DarkCyan
-    $ServerNames += $server
+    $singleServerNames += $server
   }
 }
 
@@ -222,10 +167,6 @@ if ($ClusterNames -ne $null)
   # Strip out duplicate cluster names.
   
   $clNames = $ClusterNames | Select -Unique
-
-  # Instantiate an array to hold the core cluster configurations.
-    
-  # $clCoreConfig = @()
     
   # Instantiate an array to hold the resource config.
    
@@ -234,6 +175,10 @@ if ($ClusterNames -ne $null)
   # Now that we have the unique set of cluster names, lets send the array of names to the Get-ClusterConfig function.
 
   $clCoreConfig = Get-ClusterConfig -ClusterNames $clNames
+
+  # We'll also instantiate an array to hold the cluster nodes names.
+
+  $clNodes = @()
 
   foreach ($clname in $clNames)
   {
@@ -258,6 +203,10 @@ if ($ClusterNames -ne $null)
     {
         Write-Host "No cluster data found."
     }
+
+    # Get the cluster node names.
+
+    $clNodes += Get-WmiObject -Namespace root\mscluster -ComputerName $clName -Class mscluster_node | Select-Object Name
   } 
 
     # Set the worksheet name. We will have a single tab that will hold each cluster's config for easy reference..
@@ -276,7 +225,7 @@ if ($ClusterNames -ne $null)
     else
     {
         Write-Host "No cluster data found."
-    }
+    }    
 }
 
 # We now need to get all the SQL instance names, however, retrieving them from clusters is a bit different than stand-alone servers.
@@ -290,11 +239,11 @@ if ($clNames -ne $null)
     $clSQLInstances = Get-ClusteredSQLInstances -ClusterNames $clNames
 }
 
-# Now, let's get the list of stand-alone instance names.
+# Now, let's get the list of stand-alone instance names by call the Get-SQLInstances02 function.
 
-if ($ServerNames -ne $null)
+if ($singleServerNames -ne $null)
 {
-    $SQLInstances = Get-SQLInstances02 -ComputerNames $ServerNames
+    $SQLInstances = Get-SQLInstances02 -ComputerNames $singleServerNames
 }
 
 # Finally, we will combine both lists into a single array.
@@ -316,6 +265,13 @@ else
     Write-Host "No SQL instances found..." -ForegroundColor Red
 }
 
+# Set the array name that we will use to hold the SQL Server configuration data.
+$sqlConfig = @()
+$sqlVersionConfig = @()
+
+# Set the array name that we will use to hold the Availability Group Configuration.
+$agConfigResult =@()
+
 # Now that we've retrieved all the SQL instances, let's get some info...
 
 if ($allSQLInstances -ne $null)
@@ -327,6 +283,73 @@ if ($allSQLInstances -ne $null)
     {
         Get-SQLData -InstanceName $instance -Path $SQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery -Credential $sqlCred
     }
+}
+
+# Now, let's join the cluster node names stand-alone nodes into a single array.
+$ServerList = @()
+
+if ($clNodes -ne $null)
+{
+    foreach ($item in $clNodes)
+    {
+        $ServerList += $item.Name
+    }
+}
+
+if($singleServerNames -ne $null)
+{
+    foreach ($item in $singleServerNames)
+    {
+        $ServerList += $item
+    }
+}
+
+
+#######################################################################################################################################
+#
+#
+# Spreadsheet Generation Section
+#
+#
+#######################################################################################################################################
+
+if ($ServerList -ne $null)
+{
+  # Next, we'll get the server data returned as an array.
+
+  $ServerConfigResult = Get-ServerConfig -ComputerName $ServerList
+
+  # Set the worksheet names. 
+  
+  $ServerConfigWorksheet = "Server Config"
+  $ServerDiskConfigWorksheet = "Disk Config"
+      
+  # Set the table names for the worksheet.
+  
+  $ServerConfigTableName = "ServerConfig"
+  $ServerDiskConfigTableName = "DiskConfig"
+    
+  # TO-DO: Add some error handling here (i.e. check to ensure the arrays are not empty or null).
+    
+  if ($ServerConfigResult -ne $null)
+  {
+    Write-Host "Creating server config spreadsheet..." -ForegroundColor Yellow
+    # Create a new, empty Excel document for Stand-alone Server Configuration.
+    $ServerConfigxlsxReportPath =  "$targetPath\ServerConfigReport-$datetime.xlsx"
+    
+    $excel = $ServerConfigResult[0] | Export-Excel -Path $ServerConfigxlsxReportPath -AutoSize -WorksheetName $ServerConfigWorksheet -FreezeTopRow -TableName $ServerConfigTableName -PassThru
+    $excel.Save() ; $excel.Dispose()
+    $excel2 = $ServerConfigResult[1] | Export-Excel -Path $ServerConfigxlsxReportPath -AutoSize -WorksheetName $ServerDiskConfigWorksheet -FreezeTopRow -TableName $ServerDiskConfigTableName -PassThru
+    $excel2.Save() ; $excel2.Dispose()
+  }
+  else
+  {
+    Write-Host "No server data found."
+  }
+}
+else
+{
+  Write-Host "There are no servers to check." -ForegroundColor DarkRed
 }
 
 # Let's output the Always On AG config to a spreadsheet.

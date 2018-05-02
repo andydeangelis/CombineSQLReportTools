@@ -130,8 +130,22 @@ function Get-ServerConfig
               if ($isWindows)
               {
                 
-                $ServerDiskConfigObject = Get-DbaDiskSpace -ComputerName $server
-                
+                $ServerDiskConfigObject = Get-DbaDiskSpace -ComputerName $server | Select ComputerName, Server, Name, Label, Capacity,
+                                                                                          Free, PercentFree, BlockSize, FileSystem, Type, 
+                                                                                          IsSqlDisk, Server, DriveType, SizeInGB, FreeInGB, 
+                                                                                          SizeInTB, FreeInTB
+
+                if ((Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster -ErrorAction SilentlyContinue) -ne $null)
+                {
+                  $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'Yes'
+                  $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value (Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster).Name
+                }
+                else
+                {
+                  $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'No'
+                  $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value 'NOT CLUSTERED'
+                }
+
                 $ServerDiskConfigObject  
                 
               }
