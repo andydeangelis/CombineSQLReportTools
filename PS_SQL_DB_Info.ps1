@@ -265,6 +265,8 @@ else
     Write-Host "No SQL instances found..." -ForegroundColor Red
 }
 
+$allSQLInstances = $allSQLInstances | Select -Unique
+
 # Set the array name that we will use to hold the SQL Server configuration data.
 $sqlConfig = @()
 $sqlVersionConfig = @()
@@ -303,6 +305,8 @@ if($singleServerNames -ne $null)
         $ServerList += $item
     }
 }
+
+$ServerList = $ServerList | Select -Unique
 
 
 #######################################################################################################################################
