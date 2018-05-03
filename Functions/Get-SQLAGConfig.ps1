@@ -5,15 +5,15 @@
 #    Script: Get-SQLAGConfig function
 #    Author: Andy DeAngelis
 #    Descrfiption: 
-#         Returns the running configuration of a SQL Instance.
+#         Returns the configuration of all availability groups in a list of SQL instances.
 #    Usage: 
 #           - Source the function and pass the instance name as a parameter.
 #           - This script also uses dbatools PowerShell module.
 #
 #    Examples:
-#               . .\Get-SQLVersion.ps1
+#               . .\Get-SQLAGConfig
 #
-#               Get-SQLVersion -instanceName SERVER\Instance -SQLCredential (Get-Credential)
+#               Get-SQLAGConfig -instanceNames "SERVER\Instance01","SERVER02\Instance02" -SQLCredential (Get-Credential)
 #
 #````Note: Powershellv3 or higher is needed.
 #######################################################################################################################################
