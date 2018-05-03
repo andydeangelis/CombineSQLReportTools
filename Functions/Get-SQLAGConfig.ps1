@@ -42,7 +42,7 @@ function Get-SQLAGConfig
         }
         catch
         {            
-            "No connection could be made using Domain credentials."
+            Write-Host "No connection could be made using Domain credentials." -ForegroundColor Red
         }
         if (!$testDBAConnectionDomain)
         {     
@@ -52,7 +52,7 @@ function Get-SQLAGConfig
             }
             catch
             {
-                "No connection could be made using SQL credentials."
+                Write-Host "No connection could be made using SQL credentials." -ForegroundColor Red
             }
         }
           

@@ -9,19 +9,12 @@ function Get-IsClustered
     [string[]]$ComputerName
   )
   
-  if (Test-Connection -ComputerName $ComputerName -Count 2 -Quiet)
-  {     
     if ((Get-WMIObject -Namespace root\mscluster -ComputerName $ComputerName -Class MSCluster_cluster -ErrorAction SilentlyContinue) -ne $null) 
     {      
-      return $true 
+        return $true 
     } 
     else 
     { 
-      return $false
+        return $false
     }
-  }
-  else
-  {
-    Write-Host "Unable to connect to server $ComputerName." -ForegroundColor Red
-  } 
 } 

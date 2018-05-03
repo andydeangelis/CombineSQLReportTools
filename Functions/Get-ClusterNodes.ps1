@@ -24,7 +24,7 @@ function Get-ClusterNodes
 
         foreach ($node in $clNodes)
         {
-            if (Test-Connection -ComputerName $node.Name -Count 2 -Quiet)
+            if ((Test-NetConnection -ComputerName $computer -Port 3389 -InformationLevel Quiet -WarningAction SilentlyContinue) -eq $true)
             {
                 $clServerConfigResult += Get-DbaComputerSystem -ComputerName $node.Name
                 #$clServerDiskConfig += Get-DbaDiskSpace -ComputerName $server

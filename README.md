@@ -65,7 +65,7 @@
 #				- Service pack major and minor versions
 #				- Cluster membership (if clustered)
 #
-#		Get-AGSQLConfig
+#		Get-SQLAGConfig
 #			
 #			Returns the configuration of the Availability groups for a list of SQL instances.
 #

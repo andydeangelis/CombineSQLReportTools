@@ -21,11 +21,6 @@
 #````Note: Powershellv3 or higher is needed.
 #######################################################################################################################################
 
-# Must be run on server with sql invoke-sqlcmd enabled (i.e. a server/workstation that has the SQL Client Connectivity tools installed).
-# Note, the SQL Client Connectivity Tools are not the same as SQL Management studio. SSMS does not need to be installed for this to run.
-
-. $PSScriptRoot\IncludeMe.ps1
-
 # Add the required .NET assembly for Windows Forms.
 Add-Type -AssemblyName System.Windows.Forms
 
@@ -114,6 +109,8 @@ $sqlBP = @()
 # Output the PowerShell screen text as debug file.
 
 Start-Transcript -Path $logFile
+
+. $PSScriptRoot\IncludeMe.ps1
 
 # Let's verify which servers are online and which are not.
 
@@ -398,20 +395,35 @@ if ($sqlConfig -ne $null)
   $excel2.Save() ; $excel2.Dispose()
   $excel = $sqlConfig | Export-Excel -Path $sqlConfigSpreadsheet -AutoSize -WorksheetName $sqlConfigWorksheet -FreezeTopRow -TableStyle 'Medium6' -TableName $sqlConfigTable -PassThru
   $excel.Save() ; $excel.Dispose()
-  # $excel3 = $sqlBP | Export-Excel -Path $sqlConfigSpreadsheet -AutoSize -WorksheetName $sqlBPWorksheet -FreezeTopRow -TableStyle 'Medium6' -TableName $sqlBPTable -PassThru
-  # $excel3.Save(); $excel3.Dispose()
 }
 else
 {
   Write-Host "No SQL Data to export." -ForegroundColor Red
 }
 
-# $sqlBP | Out-File -FilePath "$targetPath\BestPractice.txt"
+Write-Host "###############################################" -ForegroundColor DarkYellow
+Write-Host "############ Report Locations #################" -ForegroundColor DarkYellow
+Write-Host "###############################################" -ForegroundColor DarkYellow
 
-Write-Host "The total number of servers checked is:" -ForegroundColor Cyan -NoNewline
+Write-Host "The Transcript log file location:" -ForegroundColor Cyan -NoNewLine
+Write-Host "$logFile." -ForegroundColor Yellow
+Write-Host "The Failed Connections log file location:" -ForegroundColor Cyan -NoNewLine
+Write-Host "$failedConnections" -ForegroundColor Yellow
+Write-Host "The SQL Server DB Report log file location:" -ForegroundColor Cyan -NoNewLine
+Write-Host "$SQLDataxlsxReportPath" -ForegroundColor Yellow
+Write-Host "The Cluster Configuration Report file location:" -ForegroundColor Cyan -NoNewLine
+Write-Host "$clClusterConfigxlsxReportPath" -ForegroundColor Yellow
+Write-Host "The SQL Always On Availability Group Configuration Report file location:" -ForegroundColor Cyan -NoNewLine
+Write-Host "$agConfigxlsxReportPath" -ForegroundColor Yellow
+
+Write-Host "###############################################" -ForegroundColor DarkYellow
+Write-Host "############ Execution Times ##################" -ForegroundColor DarkYellow
+Write-Host "###############################################" -ForegroundColor DarkYellow
+
+Write-Host "The total number of Servers/Clusters checked is:" -ForegroundColor Cyan -NoNewline
 Write-Host "$($Servers.Count)" -ForegroundColor Yellow
 Write-Host "The number of alive servers is:" -ForegroundColor Cyan -NoNewline
-Write-Host "$($aliveServers.Count)" -ForegroundColor Yellow
+Write-Host "$($ServerList.Count)" -ForegroundColor Yellow
 Write-Host "The number of clusters is:" -ForegroundColor Cyan -NoNewline
 Write-Host "$($clNames.Count)" -ForegroundColor Yellow
 Write-Host "The number of SQL instances is:" -ForegroundColor Cyan -NoNewline

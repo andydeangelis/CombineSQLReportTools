@@ -9,8 +9,13 @@ function Get-IsAlive
   $aliveScript = {
 
     Param($computer)
+
+    # Let's hide the progress bars by setting the global variable $ProgressPreference for the session.
+
+    $ProgressPreference = 'SilentlyContinue'
   
-      if (Test-Connection -ComputerName $computer -Count 2 -Quiet)
+      if (((Test-NetConnection -ComputerName $computer -Port 445 -InformationLevel Quiet -WarningAction SilentlyContinue) -eq $true) -or 
+            ((Test-NetConnection -ComputerName $computer -Port 139 -InformationLevel Quiet -WarningAction SilentlyContinue) -eq $true))
       {        
         $computer
       }
