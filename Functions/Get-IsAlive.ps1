@@ -8,17 +8,43 @@ function Get-IsAlive
 
   $aliveScript = {
 
-    Param($computer)
+    Param($computer,$port)
 
     # Let's hide the progress bars by setting the global variable $ProgressPreference for the session.
 
     $ProgressPreference = 'SilentlyContinue'
-  
-      if (((Test-NetConnection -ComputerName $computer -Port 445 -InformationLevel Quiet -WarningAction SilentlyContinue) -eq $true) -or 
-            ((Test-NetConnection -ComputerName $computer -Port 139 -InformationLevel Quiet -WarningAction SilentlyContinue) -eq $true))
+
+     function Test-TCPport 
+     {
+        Param([parameter(Mandatory=$true,ValueFromPipeline=$True)][string[]]$ComputerName,
+              [parameter(Mandatory=$true,ValueFromPipeline=$True)]$TCPport
+        )
+
+        $requestCallback = $state = $null
+        $client = New-Object System.Net.Sockets.TcpClient
+        $beginConnect = $client.BeginConnect($ComputerName,$TCPport,$requestCallback,$state)
+        Start-Sleep -Milliseconds 500
+        if ($client.Connected) 
+        {
+            $open = $true
+        } 
+        else
+        {
+            $open = $false            
+        }
+
+        $client.Close()
+        
+        [pscustomobject]@{hostname=$ComputerName;port=$TCPport;open=$open}
+     }
+
+     $status = Test-TCPport -ComputerName $computer -TCPport $port
+
+     if ($status.open -eq $true)
       {        
         $computer
       }
+      
   }
 
   $Throttle = 20
@@ -29,7 +55,8 @@ function Get-IsAlive
 
   foreach ($computer in $ComputerNames)
   {
-    $isAliveJob = [powershell]::Create().AddScript($aliveScript).AddArgument($computer)
+    $port = 445
+    $isAliveJob = [powershell]::Create().AddScript($aliveScript).AddArgument($computer).AddArgument($port)
     $isAliveJob.RunspacePool = $isAliveRunspacePool
     $isAliveJobs += New-Object PSObject -Property @{
       Pipe = $isAliveJob
@@ -42,7 +69,7 @@ function Get-IsAlive
   Do
   {
     Write-Host "." -NoNewline -ForegroundColor Green
-    Start-Sleep -Milliseconds 200
+    Start-Sleep -Milliseconds 500
   } while ($isAliveJobs.Result.IsCompleted -contains $false)
 
   $aliveServers = @()
@@ -56,6 +83,8 @@ function Get-IsAlive
 
   $isAliveRunspacePool.Close()
   $isAliveRunspacePool.Dispose()
+
+ 
 
   return $aliveServers
 } 

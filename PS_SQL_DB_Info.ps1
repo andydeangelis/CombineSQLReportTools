@@ -106,11 +106,11 @@ $agConfigxlsxReportPath =  "$targetPath\AvailabilityGroupConfigReport-$datetime.
 # Create an array that will hold the SQL best practices data.
 $sqlBP = @()
 
+. $PSScriptRoot\IncludeMe.ps1
+
 # Output the PowerShell screen text as debug file.
 
 Start-Transcript -Path $logFile
-
-. $PSScriptRoot\IncludeMe.ps1
 
 # Let's verify which servers are online and which are not.
 
@@ -442,8 +442,8 @@ Write-Host "$($stopWatch.Elapsed.TotalSeconds)" -ForegroundColor Yellow
 Write-Host "Total script run time (min): " -ForegroundColor Cyan -NoNewline
 Write-Host "$($stopWatch.Elapsed.TotalMinutes)" -ForegroundColor Yellow
 
-Read-Host -Prompt "Press any key to continue"
 Stop-Transcript
+Read-Host -Prompt "Press any key to continue"
 
 # Other stuff TO-DO:
 #

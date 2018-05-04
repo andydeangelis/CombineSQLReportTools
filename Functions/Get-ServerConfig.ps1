@@ -45,60 +45,53 @@ function Get-ServerConfig
         # Ping the server to see if it is online.
         if ($server -ne $null)
         {
-            if (Test-Connection $server -Count 2 -Quiet)
-            {
-              # Server is responding to ping, but let's make sure it's a Windows machine.              
+            # Server is responding to ping, but let's make sure it's a Windows machine.              
       
-              try
-              {
-                $isWindows = (Get-WmiObject Win32_OperatingSystem -ComputerName $server -erroraction 'silentlycontinue').Name         
-              }
-              catch
-              {
-                Write-Host "Unable to connect to $server. Is this a Windows OS?" -ForegroundColor Red
-              }
-              if ($isWindows)
-              {
+            try
+            {
+            $isWindows = (Get-WmiObject Win32_OperatingSystem -ComputerName $server -erroraction 'silentlycontinue').Name         
+            }
+            catch
+            {
+            Write-Host "Unable to connect to $server. Is this a Windows OS?" -ForegroundColor Red
+            }
+            if ($isWindows)
+            {
                 
-                $ServerConfigObject = Get-DbaComputerSystem -ComputerName $server -WarningAction SilentlyContinue
-                $ServerOSObject = Get-DbaOperatingSystem -ComputerName $server -WarningAction SilentlyContinue                
+            $ServerConfigObject = Get-DbaComputerSystem -ComputerName $server -WarningAction SilentlyContinue
+            $ServerOSObject = Get-DbaOperatingSystem -ComputerName $server -WarningAction SilentlyContinue                
             
-                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name TotalVisibleMemory -Value $ServerOSObject.TotalVisibleMemory
-                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name FreePhysicalMemory -Value $ServerOSObject.FreePhysicalMemory
-                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name TotalVirtualMemory -Value $ServerOSObject.TotalVirtual
-                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name FreeVirtualMemory -Value $ServerOSObject.FreeVirtualMemory
-                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name OperatingSystem -Value (Get-WMIObject win32_OperatingSystem -ComputerName $server).Caption
-                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name Version -Value (Get-WMIObject win32_OperatingSystem -ComputerName $server).Version
-                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name ServicePackMajorVersion -Value (Get-WMIObject win32_OperatingSystem -ComputerName $server).ServicePackMajorVersion
-                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name ServicePackMinorVersion -Value (Get-WMIObject win32_OperatingSystem -ComputerName $server).ServicePackMinorVersion
+            $ServerConfigObject | Add-Member -MemberType NoteProperty -Name TotalVisibleMemory -Value $ServerOSObject.TotalVisibleMemory
+            $ServerConfigObject | Add-Member -MemberType NoteProperty -Name FreePhysicalMemory -Value $ServerOSObject.FreePhysicalMemory
+            $ServerConfigObject | Add-Member -MemberType NoteProperty -Name TotalVirtualMemory -Value $ServerOSObject.TotalVirtual
+            $ServerConfigObject | Add-Member -MemberType NoteProperty -Name FreeVirtualMemory -Value $ServerOSObject.FreeVirtualMemory
+            $ServerConfigObject | Add-Member -MemberType NoteProperty -Name OperatingSystem -Value (Get-WMIObject win32_OperatingSystem -ComputerName $server).Caption
+            $ServerConfigObject | Add-Member -MemberType NoteProperty -Name Version -Value (Get-WMIObject win32_OperatingSystem -ComputerName $server).Version
+            $ServerConfigObject | Add-Member -MemberType NoteProperty -Name ServicePackMajorVersion -Value (Get-WMIObject win32_OperatingSystem -ComputerName $server).ServicePackMajorVersion
+            $ServerConfigObject | Add-Member -MemberType NoteProperty -Name ServicePackMinorVersion -Value (Get-WMIObject win32_OperatingSystem -ComputerName $server).ServicePackMinorVersion
             
-                if ((Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster -ErrorAction SilentlyContinue) -ne $null)
-                {
-                  $ServerConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'Yes'
-                  $ServerConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value (Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster).Name
-                }
-                else
-                {
-                  $ServerConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'No'
-                  $ServerConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value 'NOT CLUSTERED'
-                }
-            
-                $ServerConfigObject.PSObject.Properties.Remove('SystemSkuNumber')
-                $ServerConfigObject.PSObject.Properties.Remove('IsDaylightSavingsTime')
-                $ServerConfigObject.PSObject.Properties.Remove('DaylightInEffect')
-                $ServerConfigObject.PSObject.Properties.Remove('AdminPasswordStatus')
-                $ServerConfigObject.PSObject.Properties.Remove('TotalPhysicalMemory')
-            
-                # $Using:ServerConfigResult += $ServerConfigObject
-
-                $ServerConfigObject  
-                
-              }
+            if ((Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster -ErrorAction SilentlyContinue) -ne $null)
+            {
+                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'Yes'
+                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value (Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster).Name
             }
             else
             {
-              Write-Host "Server $server can not be contacted." -foregroundcolor Red
+                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'No'
+                $ServerConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value 'NOT CLUSTERED'
             }
+            
+            $ServerConfigObject.PSObject.Properties.Remove('SystemSkuNumber')
+            $ServerConfigObject.PSObject.Properties.Remove('IsDaylightSavingsTime')
+            $ServerConfigObject.PSObject.Properties.Remove('DaylightInEffect')
+            $ServerConfigObject.PSObject.Properties.Remove('AdminPasswordStatus')
+            $ServerConfigObject.PSObject.Properties.Remove('TotalPhysicalMemory')
+            
+            # $Using:ServerConfigResult += $ServerConfigObject
+
+            $ServerConfigObject  
+                
+              }           
         }
         else
         {
@@ -115,44 +108,37 @@ function Get-ServerConfig
 
         if ($server -ne $null)
         {
-            if (Test-Connection $server -Count 2 -Quiet)
-            {
-              # Server is responding to ping, but let's make sure it's a Windows machine.              
+            # Server is responding to ping, but let's make sure it's a Windows machine.              
       
-              try
-              {
-                $isWindows = (Get-WmiObject Win32_OperatingSystem -ComputerName $server -erroraction 'silentlycontinue').Name         
-              }
-              catch
-              {
-                Write-Host "Unable to connect to $server. Is this a Windows OS?" -ForegroundColor Red
-              }
-              if ($isWindows)
-              {
+            try
+            {
+            $isWindows = (Get-WmiObject Win32_OperatingSystem -ComputerName $server -erroraction 'silentlycontinue').Name         
+            }
+            catch
+            {
+            Write-Host "Unable to connect to $server. Is this a Windows OS?" -ForegroundColor Red
+            }
+            if ($isWindows)
+            {
                 
-                $ServerDiskConfigObject = Get-DbaDiskSpace -ComputerName $server | Select ComputerName, Server, Name, Label, Capacity,
-                                                                                          Free, PercentFree, BlockSize, FileSystem, Type, 
-                                                                                          IsSqlDisk, Server, DriveType, SizeInGB, FreeInGB, 
-                                                                                          SizeInTB, FreeInTB
+            $ServerDiskConfigObject = Get-DbaDiskSpace -ComputerName $server | Select ComputerName, Server, Name, Label, Capacity,
+                                                                                        Free, PercentFree, BlockSize, FileSystem, Type, 
+                                                                                        IsSqlDisk, Server, DriveType, SizeInGB, FreeInGB, 
+                                                                                        SizeInTB, FreeInTB
 
-                if ((Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster -ErrorAction SilentlyContinue) -ne $null)
-                {
-                  $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'Yes'
-                  $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value (Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster).Name
-                }
-                else
-                {
-                  $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'No'
-                  $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value 'NOT CLUSTERED'
-                }
-
-                $ServerDiskConfigObject  
-                
-              }
+            if ((Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster -ErrorAction SilentlyContinue) -ne $null)
+            {
+                $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'Yes'
+                $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value (Get-WMIObject -Namespace root\mscluster -ComputerName $server -Class MSCluster_cluster).Name
             }
             else
             {
-              Write-Host "Server $server can not be contacted." -foregroundcolor Red
+                $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name IsClustered -Value 'No'
+                $ServerDiskConfigObject | Add-Member -MemberType NoteProperty -Name ClusterName -Value 'NOT CLUSTERED'
+            }
+
+            $ServerDiskConfigObject  
+                
             }
         }
         else
