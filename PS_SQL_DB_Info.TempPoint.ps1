@@ -1,5 +1,7 @@
 ﻿#######################################################################################################################################
 #
+#
+#
 #    Script: SQL Server Reporting Script
 #    Author: Andy DeAngelis
 #    Descrfiption: 
@@ -91,6 +93,8 @@ if (!(Test-Path $logFile))
 {
     New-Item -ItemType File -Force -Path $logFile
 }
+
+Write-Host "Server Config will be written to $ServerConfigxlsxReportPath" -ForegroundColor DarkGreen
 
 # Create a new, empty Excel document for SQL Data.
 $SQLDataxlsxReportPath =  "$targetPath\SQLServerDBReport-$datetime.xlsx"
@@ -310,15 +314,13 @@ $ServerList = $ServerList | Select -Unique
 #
 #######################################################################################################################################
 
-# Gemerate the Server configuration and installed SQL services spreadsheets.
-
 if ($ServerList -ne $null)
 {
   # Next, we'll get the server data returned as an array.
-	
-	$ServerConfigResult = Get-ServerConfig -ComputerName $ServerList
-	
-	# Set the worksheet names. 
+
+  $ServerConfigResult = Get-ServerConfig -ComputerName $ServerList
+
+  # Set the worksheet names. 
   
   $ServerConfigWorksheet = "Server Config"
   $ServerDiskConfigWorksheet = "Disk Config"
@@ -332,6 +334,7 @@ if ($ServerList -ne $null)
     
   if ($ServerConfigResult -ne $null)
   {
+    Write-Host "Creating server config spreadsheet..." -ForegroundColor Yellow
     # Create a new, empty Excel document for Stand-alone Server Configuration.
     $ServerConfigxlsxReportPath =  "$targetPath\ServerConfigReport-$datetime.xlsx"
     
@@ -343,36 +346,11 @@ if ($ServerList -ne $null)
   else
   {
     Write-Host "No server data found."
-	}
-	
-	# Let's get a list of all SQL services installed.
-	
-	$installedSQLSvcs = Get-InstalledSQLServices -ComputerNames $ServerList
-	
-	$SQLSvcsConfigWorksheet = "SQL Services"
-	
-	# Set the table names for the worksheet.
-	
-	$SQLSvcsConfigTableName = "SQLSvcs"
-	
-	# TO-DO: Add some error handling here (i.e. check to ensure the arrays are not empty or null).
-	
-	if ($installedSQLSvcs -ne $null)
-	{
-		# Create a new, empty Excel document for Stand-alone Server Configuration.
-		$installedSQLSvcsxlsxReportPath = "$targetPath\InstalledSQLServicesReport-$datetime.xlsx"
-		
-		$excel = $installedSQLSvcs | Export-Excel -Path $installedSQLSvcsxlsxReportPath -AutoSize -WorksheetName $SQLSvcsConfigWorksheet -FreezeTopRow -TableName $SQLSvcsConfigTableName -PassThru
-		$excel.Save(); $excel.Dispose()
-	}
-	else
-	{
-		Write-Host "No SQL services found."
-	}
+  }
 }
 else
 {
-	Write-Host "There are no servers to check." -ForegroundColor DarkRed
+  Write-Host "There are no servers to check." -ForegroundColor DarkRed
 }
 
 # Let's output the Always On AG config to a spreadsheet.

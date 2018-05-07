@@ -33,7 +33,6 @@ Import-Module -Name "$PSScriptRoot\Modules\ImportExcel\ImportExcel.psm1" -Scope 
 . "$PSScriptRoot\Functions\Test-SQLBP.ps1"
 . "$PSScriptRoot\Functions\Get-SQLVersion.ps1"
 . "$PSScriptRoot\Functions\Get-SQLAGConfig.ps1"
-. "$PSScriptRoot\Functions\Get-InstalledSQLServices.ps1"
 
 # Source the Get-ServerConfig function
 
