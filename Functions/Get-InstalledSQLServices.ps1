@@ -9,6 +9,8 @@
 	===========================================================================
 	.DESCRIPTION
 		Function to return a list of all SQL services installed on a computer.
+
+	#````Note: Powershellv3 or higher and dbatools is needed.
 #>
 
 function Get-InstalledSQLServices
