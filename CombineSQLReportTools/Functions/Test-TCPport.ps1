@@ -7,7 +7,7 @@
     $requestCallback = $state = $null
     $client = New-Object System.Net.Sockets.TcpClient
     $beginConnect = $client.BeginConnect($ComputerName,$TCPport,$requestCallback,$state)
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds 2000
     if ($client.Connected) 
     {
         $open = $true

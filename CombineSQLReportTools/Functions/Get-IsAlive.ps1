@@ -58,7 +58,7 @@ function Get-IsAlive
 
   foreach ($computer in $ComputerNames)
   {
-	$port = 445
+	$port = 5985
     $isAliveJob = [powershell]::Create().AddScript($aliveScript).AddArgument($computer).AddArgument($port)
     $isAliveJob.RunspacePool = $isAliveRunspacePool
     $isAliveJobs += New-Object PSObject -Property @{

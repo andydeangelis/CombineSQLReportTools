@@ -14,24 +14,36 @@
 #           - The credential passed in the Get-Credential call needs to be a SysAdmin in each SQL instance to gather SQL data.
 #           - This script also uses dbatools and ImportExcel PowerShell modules
 #    Examples:
-#               .\PS_SQL_DB_Info.ps1
+# 				$sqlCred = Get-Credential
+# 				$domainCred = Get-Credential
+#               .\PS_SQL_DB_Info.ps1 -ServerFileName C:\temp\myservers.txt -ReportPath C:\temp -SQLCredentials $sqlCred -DomainCredentials $domainCred
+#
+#				$sqlCredXML = Get-Credential | ExportCliXML sqlCred.xml
+# 				$domainCredXML = Get-Credential | Export-CliXML domainCred.XML
+# 				.\PS_SQL_DB_Info.ps1 -ServerFileName C:\temp\myservers.txt -ReportPath C:\temp -SQLCredXMLFile $sqlCredXML -DomainCredXMLFile $DomainCredXML
+#
+#				$sqlCredXML = Get-Credential | ExportCliXML sqlCred.xml
+# 				$domainCredXML = Get-Credential | Export-CliXML domainCred.XML
+# 				.\PS_SQL_DB_Info.ps1 -ServerFileName C:\temp\myservers.txt -ReportPath C:\temp -SQLCredXMLFile $sqlCredXML -DomainCredXMLFile $DomainCredXML -SaveCreds $true
 #
 #````Note: Powershellv3 or higher is needed.
 #######################################################################################################################################
 
 param (
 	[parameter(Mandatory = $true, ValueFromPipeline = $True)] [string[]]
-	$ServerFileName,
+	[string]$ServerFileName,
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
-	$ReportPath,
+	[string]$ReportPath,
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
-	$SQLCredXMLFile,
+	[string]$SQLCredXMLFile,
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
-	$DomainCredXMLFile,
+	[string]$DomainCredXMLFile,
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
-	$SQLCredentials,
+	[System.Management.Automation.PSCredential]$SQLCredentials,
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
-	$DomainCredentials
+	[System.Management.Automation.PSCredential]$DomainCredentials,
+	[parameter(Mandatory = $false, ValueFromPipeline = $false)]
+	[boolean]$SaveCreds = $false
 )
 # Add the required .NET assembly for Windows Forms.
 Add-Type -AssemblyName System.Windows.Forms
@@ -59,7 +71,10 @@ elseif ($SQLCredentials -and (-not $SQLCredXMLFile))
 elseif ((-not $SQLCredentials) -and $SQLCredXMLFile)
 {
 	$sqlCred = Import-Clixml -Path $SQLCredXMLFile
-	Remove-Item $SQLCredXMLFile -Force
+	if (-not $SaveCreds)
+	{
+		Remove-Item $SQLCredXMLFile -Force
+	}
 }
 elseif ($SQLCredentials -and $SQLCredXMLFile)
 {
@@ -90,7 +105,10 @@ elseif ($DomainCredentials -and (-not $DomainCredXMLFile))
 elseif ((-not $DomainCredentials) -and $DomainCredXMLFile)
 {
 	$domainCred = Import-Clixml -Path $DomainCredXMLFile
-	Remove-Item $DomainCredXMLFile -Force
+	if (-not $SaveCreds)
+	{
+		Remove-Item $DomainCredXMLFile -Force
+	}
 }
 elseif ($DomainCredentials -and $DomainCredXMLFiles)
 {
@@ -556,6 +574,8 @@ Write-Host "Total script run time (min): " -ForegroundColor Cyan -NoNewline
 Write-Host "$($stopWatch.Elapsed.TotalMinutes)" -ForegroundColor Yellow
 
 Stop-Transcript
+
+Write-Host "Data collection completed..."
 # Read-Host -Prompt "Jobs completed. Press any key to continue"
 
 # Other stuff TO-DO:
