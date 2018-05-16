@@ -1,0 +1,26 @@
+﻿<ProjectState>
+  <Version>1.0</Version>
+  <FileID>087317a2-0313-447d-a28b-5df2729d3b06</FileID>
+  <OpenFolders>
+    <Folder>CombineSQLReportTools</Folder>
+    <Folder>CombineSQLReportTools\Functions</Folder>
+    <Folder>CombineSQLReportTools\Modules</Folder>
+    <Folder>CombineSQLReportTools\SQLScripts</Folder>
+  </OpenFolders>
+  <OpenFiles>
+    <File>MainForm.psf</File>
+    <File>CombineSQLReportTools\PS_SQL_DB_Info.ps1</File>
+    <File>CombineSQLReportTools\Functions\Get-SQLAGConfig.ps1</File>
+    <File>CombineSQLReportTools\Functions\Get-SQLConfig.ps1</File>
+    <File>CombineSQLReportTools\Functions\Get-SQLData.ps1</File>
+    <File>CombineSQLReportTools\Functions\Get-IsAlive.ps1</File>
+    <File>CombineSQLReportTools\Functions\Get-IsClustered.ps1</File>
+    <File>CombineSQLReportTools\Functions\Get-ClusteredSQLInstances.ps1</File>
+    <File>CombineSQLReportTools\Functions\Get-SQLInstances02.ps1</File>
+    <File>CombineSQLReportTools\Functions\Test-SQLBP.ps1</File>
+    <File>Globals.ps1</File>
+    <File>Startup.pss</File>
+    <File>CombineSQLReportTools\Functions\Get-ClusterConfig.ps1</File>
+    <File>CombineSQLReportTools\Functions\Get-ServerConfig.ps1</File>
+  </OpenFiles>
+</ProjectState>
