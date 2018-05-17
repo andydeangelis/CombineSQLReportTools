@@ -38,81 +38,114 @@ param (
 	[string]$SQLCredXMLFile,
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
 	[string]$DomainCredXMLFile,
+	[parameter(Mandatory = $false, ValueFromPipeline = $false)]
+	[switch]$SaveCreds = $false,
+	[parameter(Mandatory = $false, ValueFromPipeline = $false)]
+	[switch]$RunSilent = $false,
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
 	[System.Management.Automation.PSCredential]$SQLCredentials,
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
-	[System.Management.Automation.PSCredential]$DomainCredentials,
-	[parameter(Mandatory = $false, ValueFromPipeline = $false)]
-	[boolean]$SaveCreds = $false
+	[System.Management.Automation.PSCredential]$DomainCredentials	
 )
 # Add the required .NET assembly for Windows Forms.
 Add-Type -AssemblyName System.Windows.Forms
 
 # Check if the SQL Credentials are set. If the user needs to specify a separate SQL logon, they will be prompted with a credential dialog.
-if ((-not $SQLCredentials) -and (-not $SQLCredXMLFile))
+
+if (-not $RunSilent)
 {
-	# Show the MsgBox. This is going to ask if the user needs to specify a separate SQL logon.
-	$result = [System.Windows.Forms.MessageBox]::Show('Do you need to specify a separate SQL logon account?', 'Warning', 'YesNo', 'Warning')
-	
-	if ($result -eq 'Yes')
+	if ((-not $SQLCredentials) -and (-not $SQLCredXMLFile))
 	{
-		$sqlCred = Get-Credential -Message "Please specify your SQL username and password."
+		# Show the MsgBox. This is going to ask if the user needs to specify a separate SQL logon.
+		$result = [System.Windows.Forms.MessageBox]::Show('Do you need to specify a separate SQL logon account?', 'Warning', 'YesNo', 'Warning')
+		
+		if ($result -eq 'Yes')
+		{
+			$sqlCred = Get-Credential -Message "Please specify your SQL username and password."
+		}
+		else
+		{
+			Write-Warning 'No SQL logon specifed. Using domain account...'
+		}
+	}
+	elseif ($SQLCredentials -and (-not $SQLCredXMLFile))
+	{
+		Write-Host "Using SQL Credentials." -ForegroundColor Yellow
+		$sqlCred = $SQLCredentials
+	}
+	elseif ((-not $SQLCredentials) -and $SQLCredXMLFile)
+	{
+		$sqlCred = Import-Clixml -Path $SQLCredXMLFile
+		if (-not $SaveCreds)
+		{
+			Remove-Item $SQLCredXMLFile -Force
+		}
+	}
+	elseif ($SQLCredentials -and $SQLCredXMLFile)
+	{
+		Write-Host "Using SQL Credentials." -ForegroundColor Yellow
+		$sqlCred = $SQLCredentials
+	}
+}
+else
+{
+	if (-not $SQLCredXMLFile)
+	{
+		Write-Host "No SQL Credential file found!" -ForegroundColor Red
+		exit
 	}
 	else
 	{
-		Write-Warning 'No SQL logon specifed. Using domain account...'
+		$sqlCred = Import-Clixml -Path $SQLCredXMLFile
 	}
-}
-elseif ($SQLCredentials -and (-not $SQLCredXMLFile))
-{
-	Write-Host "Using SQL Credentials." -ForegroundColor Yellow
-	$sqlCred = $SQLCredentials
-}
-elseif ((-not $SQLCredentials) -and $SQLCredXMLFile)
-{
-	$sqlCred = Import-Clixml -Path $SQLCredXMLFile
-	if (-not $SaveCreds)
-	{
-		Remove-Item $SQLCredXMLFile -Force
-	}
-}
-elseif ($SQLCredentials -and $SQLCredXMLFile)
-{
-	Write-Host "Using SQL Credentials." -ForegroundColor Yellow
-	$sqlCred = $SQLCredentials
 }
 
 # Check if domain credentials are being passed.
 
-if ((-not $DomainCredentials) -and (-not $DomainCredXMLFile))
+if (-not $RunSilent)
 {
-	# Show the MsgBox. This is going to ask if the user needs to specify a separate Domain logon.
-	$result = [System.Windows.Forms.MessageBox]::Show('Do you need to specify a separate Domain logon account?', 'Warning', 'YesNo', 'Warning')
-	
-	if ($result -eq 'Yes')
+	if ((-not $DomainCredentials) -and (-not $DomainCredXMLFile))
 	{
-		$domainCred = Get-Credential -Message "Please specify your domain name and password that has the rights to query WMI on the target servers."
+		# Show the MsgBox. This is going to ask if the user needs to specify a separate Domain logon.
+		$result = [System.Windows.Forms.MessageBox]::Show('Do you need to specify a separate Domain logon account?', 'Warning', 'YesNo', 'Warning')
+		
+		if ($result -eq 'Yes')
+		{
+			$domainCred = Get-Credential -Message "Please specify your domain name and password that has the rights to query WMI on the target servers."
+		}
+		else
+		{
+			Continue
+		}
+	}
+	elseif ($DomainCredentials -and (-not $DomainCredXMLFile))
+	{
+		$domainCred = $DomainCredentials
+	}
+	elseif ((-not $DomainCredentials) -and $DomainCredXMLFile)
+	{
+		$domainCred = Import-Clixml -Path $DomainCredXMLFile
+		if (-not $SaveCreds)
+		{
+			Remove-Item $DomainCredXMLFile -Force
+		}
+	}
+	elseif ($DomainCredentials -and $DomainCredXMLFiles)
+	{
+		$domainCred = $DomainCredentials
+	}
+}
+else
+{
+	if (-not $DomainCredXMLFile)
+	{
+		Write-Host "No Domain credential file found!" -ForegroundColor Red
+		exit
 	}
 	else
 	{
-		Continue
+		$domainCred = Import-Clixml -Path $DomainCredXMLFile
 	}
-}
-elseif ($DomainCredentials -and (-not $DomainCredXMLFile))
-{
-	$domainCred = $DomainCredentials
-}
-elseif ((-not $DomainCredentials) -and $DomainCredXMLFile)
-{
-	$domainCred = Import-Clixml -Path $DomainCredXMLFile
-	if (-not $SaveCreds)
-	{
-		Remove-Item $DomainCredXMLFile -Force
-	}
-}
-elseif ($DomainCredentials -and $DomainCredXMLFiles)
-{
-	$domainCred = $DomainCredentials
 }
 
 # List SQL scripts.
