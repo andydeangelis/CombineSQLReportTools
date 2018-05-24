@@ -197,12 +197,11 @@ function Get-SQLAGConfig
 		
 		if ($sqlObj.IsHaDREnabled)
 		{
-			$agConfigResult = @()
-			
 			# Depending on what credentials successfully connected, we'll pull the SP configure data.'
 			
 			if ($testDBAConnectionSession -or $testDBAConnectionSQL -or $testDBAConnectionDomain)
 			{
+				$agConfigResult = @()
 				$ags = $sqlObj.AvailabilityGroups
 				
 				foreach ($ag in $ags)

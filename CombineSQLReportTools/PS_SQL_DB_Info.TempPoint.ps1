@@ -45,13 +45,8 @@ param (
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
 	[System.Management.Automation.PSCredential]$SQLCredentials,
 	[parameter(Mandatory = $false, ValueFromPipeline = $True)]
-	[System.Management.Automation.PSCredential]$DomainCredentials
+	[System.Management.Automation.PSCredential]$DomainCredentials	
 )
-
-# Clear the error log.
-
-# $Error.Clear()
-
 # Add the required .NET assembly for Windows Forms.
 Add-Type -AssemblyName System.Windows.Forms
 
@@ -411,10 +406,7 @@ $sqlConfig = @()
 $sqlVersionConfig = @()
 
 # Set the array name that we will use to hold the Availability Group Configuration.
-$agConfigResult = @()
-
-# Set the array name we will use to store the backup history.
-$backupHistory = @()
+$agConfigResult =@()
 
 # Now that we've retrieved all the SQL instances, let's get some info...
 
@@ -422,11 +414,7 @@ if ($allSQLInstances -ne $null)
 {
     $sqlConfig += Get-SQLConfig -instanceNames $allSQLInstances -SQLCredential $sqlCred -domainCredential $domainCred
     $sqlVersionConfig += Get-SQLVersion -InstanceNames $allSQLInstances -SQLCredential $sqlCred -domainCredential $domainCred
-	$agConfigResult += Get-SQLAGConfig -InstanceNames $allSQLInstances -SQLCredential $sqlCred -domainCredential $domainCred
-	$backupHistory += Get-BackupHistory -InstanceNames $allSQLInstances -SQLCredential $sqlCred -domainCredential $domainCred
-	
-	# TO-DO: Need to multi-thread this function.
-	
+    $agConfigResult += Get-SQLAGConfig -InstanceNames $allSQLInstances -SQLCredential $sqlCred -domainCredential $domainCred
     foreach ($instance in $allSQLInstances)
     {
 		Get-SQLData -InstanceName $instance -ReportExportFileName $SQLDataxlsxReportPath -SQLQueryFile $SQLStatsQuery -SQLCredential $sqlCred -domainCredential $domainCred
@@ -496,7 +484,7 @@ if ($ServerList -ne $null)
   else
   {
     Write-Host "No server data found."
-  }	
+	}
 	
 	# Let's get a list of all SQL services installed.
 	
@@ -552,50 +540,21 @@ else
     Write-Host "No Availability Group server data."
 }
 
-# Export the backup history to a spreadsheet.
+# As a last step, we will export all SQL server config and best practices data to a different spreadsheet.
 
-if ($backupHistory -ne $null)
-{
-	$backupHistorySpreadsheet = "$targetPath\BackupHistory-$datetime.xlsx"
-	
-	# $instanceBackupHistory = $backupHistory | ?{ $_.SqlInstance -eq $sqlInstanceName.SqlInstance }
-	<#
-	$backupWorksheet = "Backups"
-	$backupTable = "BackupTable"
-	
-	$excel = $backupHistory | Export-Excel -Path $backupHistorySpreadsheet -AutoSize -WorksheetName $backupWorksheet -FreezeTopRow -TableName $backupTable -PassThru
-	$excel.Save(); $excel.Dispose()
-	/#>
-	
-	$sqlInstanceNames = $backupHistory | select -Unique SqlInstance
-	
-	foreach ($sqlInstanceName in $sqlInstanceNames)
-	{
-		$instanceBackupHistory = $backupHistory | ?{ $_.SqlInstance -eq $sqlInstanceName.SqlInstance }
-		
-		$backupWorksheet = "$($sqlInstanceName.SqlInstance)" -replace "\\", "-"
-		$backupTable = "$($sqlInstanceName.SqlInstance)" -replace "\\", "-"
-		
-		$excel = $instanceBackupHistory | Export-Excel -Path $backupHistorySpreadsheet -AutoSize -WorksheetName $backupWorksheet -FreezeTopRow -TableName $backupTable -PassThru
-		$excel.Save(); $excel.Dispose()
-	}
-}
+$sqlConfigWorksheet = "SQL Configs"
+$sqlConfigTable = "SQL_SP_Configs"
 
-# Next, export all SQL server config and best practices data to a different spreadsheet.
+$sqlVersionConfigWorksheet = "SQL Versions"
+$sqlVersionConfigTable = "SQLVersionConfigs"
+
+$sqlBPWorksheet = "SQL Best Practices"
+$sqlBPTable = "SQLBestPractices"
+
+$sqlConfigSpreadsheet =  "$targetPath\sqlConfig-$datetime.xlsx"
 
 if ($sqlConfig -ne $null)
 {
-	$sqlConfigWorksheet = "SQL Configs"
-	$sqlConfigTable = "SQL_SP_Configs"
-	
-	$sqlVersionConfigWorksheet = "SQL Versions"
-	$sqlVersionConfigTable = "SQLVersionConfigs"
-	
-	$sqlBPWorksheet = "SQL Best Practices"
-	$sqlBPTable = "SQLBestPractices"
-	
-	$sqlConfigSpreadsheet = "$targetPath\sqlConfig-$datetime.xlsx"
-	
   $excel2 = $sqlVersionConfig | Export-Excel -Path $sqlConfigSpreadsheet -Autosize -Worksheet $sqlVersionConfigWorksheet -FreezeTopRow -TableStyle 'Medium6' -TableName $sqlVersionConfigTable -PassThru
   $excel2.Save() ; $excel2.Dispose()
   $excel = $sqlConfig | Export-Excel -Path $sqlConfigSpreadsheet -AutoSize -WorksheetName $sqlConfigWorksheet -FreezeTopRow -TableStyle 'Medium6' -TableName $sqlConfigTable -PassThru
@@ -605,10 +564,6 @@ else
 {
   Write-Host "No SQL Data to export." -ForegroundColor Red
 }
-
-# Last, export the $Error variable to a log file.
-
-# $Error | Out-File "$target\ErrorLog.log"
 
 Write-Host "###############################################" -ForegroundColor DarkYellow
 Write-Host "############ Report Locations #################" -ForegroundColor DarkYellow
@@ -624,8 +579,6 @@ Write-Host "The Cluster Configuration Report file location:" -ForegroundColor Cy
 Write-Host "$clClusterConfigxlsxReportPath" -ForegroundColor Yellow
 Write-Host "The SQL Always On Availability Group Configuration Report file location:" -ForegroundColor Cyan -NoNewLine
 Write-Host "$agConfigxlsxReportPath" -ForegroundColor Yellow
-Write-Host "The SQL Backup History Report file location:" -ForegroundColor Cyan -NoNewLine
-Write-Host "$backupHistorySpreadsheet" -ForegroundColor Yellow
 
 Write-Host "###############################################" -ForegroundColor DarkYellow
 Write-Host "############ Execution Times ##################" -ForegroundColor DarkYellow
